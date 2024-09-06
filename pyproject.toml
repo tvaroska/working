@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "working"
+version = "0.1.0"
+description = ""
+authors = ["Boris Tvaroska <boris@tvaroska.sk>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+google-cloud-aiplatform = "^1.64.0"
+flet = "^0.24.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
