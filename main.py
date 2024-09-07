@@ -83,12 +83,28 @@ async def main(page: ft.Page):
                 writer.append(Content(role='USER', parts=[reviewer_response.candidates[0].content.parts[0]]))
                 reviewer.append(Content(role='MODEL', parts=[reviewer_response.candidates[0].content.parts[0]]))
                 
+            tabs = []
+            for idx, summary in enumerate(summaries):
+                tabs.append(
+                    ft.Tab(
+                        text = f'Iteration {idx+1}',
+                        content = ft.Container(
+                            content=ft.Text(summary)
+                        )
+                    )
+                )
+            outputs.controls = [
+                ft.Tabs(
+                    selected_index=len(summaries)+1,
+                    tabs=tabs
+                )
+            ]
+
             await update_text('Done')
 
-            model_response.value = summaries[-1]
 
         else:
-            model_response.value = "Cancelled!"
+            outputs.controls[0].value = "Cancelled!"
 
          
 
@@ -125,8 +141,9 @@ async def main(page: ft.Page):
         content=file_column
     )
 
-    model_response = ft.Text("Response will be here")
     page.overlay.append(pick_file_dialog)
+
+    outputs = ft.Column(col=9, controls=[ft.Text("Response will be here")])
 
     page.add(
         ft.AppBar(
@@ -141,7 +158,7 @@ async def main(page: ft.Page):
                     col=2,
                     controls=[file_container]),
                 ft.Column(col=1, controls=[ft.VerticalDivider()]),
-                ft.Column(col=9, controls=[model_response])
+                outputs
             ]
         )
     )
