@@ -3,11 +3,11 @@ name = "working"
 version = "0.1.0"
 description = ""
 authors = ["Boris Tvaroska <boris@tvaroska.sk>"]
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-google-cloud-aiplatform = "^1.64.0"
-flet = "^0.24.0"
+flet = "^0.24.1"
 
 
 [build-system]
