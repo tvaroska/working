@@ -9,10 +9,9 @@ ENV GOOGLE_VERTEX_LOCATION=$GOOGLE_VERTEX_LOCATION
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=optional
 
 COPY . . 
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+CMD ["npm", "run", "dev"]
