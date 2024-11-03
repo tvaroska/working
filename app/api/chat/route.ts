@@ -1,6 +1,8 @@
-import { vertex } from "@ai-sdk/google-vertex";
+import { createVertex } from "@ai-sdk/google-vertex";
 import { createEdgeRuntimeAPI } from "@assistant-ui/react/edge";
- 
+
 export const { POST } = createEdgeRuntimeAPI({
-  model: vertex("gemini-1.5-pro"),
+
+  model: createVertex({project:'boris001', location:'us-central1'})("gemini-1.5-pro"),
+
 });

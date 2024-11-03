@@ -9,6 +9,7 @@ ENV GOOGLE_VERTEX_LOCATION=$GOOGLE_VERTEX_LOCATION
 WORKDIR /app
 
 COPY package*.json ./
+RUN npm install
 
 COPY . . 
 
