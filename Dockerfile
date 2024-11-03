@@ -1,5 +1,11 @@
 FROM node:20 AS base
 
+ARG GOOGLE_VERTEX_PROJECT
+ENV GOOGLE_VERTEX_PROJECT=$GOOGLE_VERTEX_PROJECT
+
+ARG GOOGLE_VERTEX_LOCATION
+ENV GOOGLE_VERTEX_LOCATION=$GOOGLE_VERTEX_LOCATION
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -11,4 +17,4 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["node", ".next/standalone/server.js"]
