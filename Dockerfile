@@ -1,18 +1,13 @@
-FROM node:20 AS base
-
-ARG GOOGLE_VERTEX_PROJECT
-ENV GOOGLE_VERTEX_PROJECT=$GOOGLE_VERTEX_PROJECT
-
-ARG GOOGLE_VERTEX_LOCATION
-ENV GOOGLE_VERTEX_LOCATION=$GOOGLE_VERTEX_LOCATION
-
+FROM node:20-alpine
 WORKDIR /app
-
 COPY package*.json ./
+RUN rm -rf .next/
+RUN rm -rf node_modules/
+RUN npm install -g npm@10.9.0
+RUN npm i sharp
+RUN npm update -g
 RUN npm install
-
-COPY . . 
-
+COPY . .
+RUN npm run build
 EXPOSE 3000
-
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start"]
