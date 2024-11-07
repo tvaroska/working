@@ -4,4 +4,4 @@ steps:
 options:
   logging: CLOUD_LOGGING_ONLY
 images:
-- 'us-central1-docker.pkg.dev/borisfrontend/containers/frontend'
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/containers/frontend'
