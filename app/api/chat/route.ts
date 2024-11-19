@@ -3,7 +3,7 @@ import { createEdgeRuntimeAPI } from "@assistant-ui/react/edge";
 
 export const { POST } = createEdgeRuntimeAPI({
   model: createVertex({
-    project: process.env.PROJECT_ID,
+    project: 'boris001',
     location: 'us-central1'
   })("gemini-1.5-flash")
 });
