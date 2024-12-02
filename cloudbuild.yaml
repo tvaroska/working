@@ -1,7 +1,0 @@
-steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '--build-arg', 'GOOGLE_VERTEX_PROJECT=$PROJECT_ID', '--build-arg', 'GOOGLE_VERTEX_LOCATION=us-central1', '-t', 'us-central1-docker.pkg.dev/borisfrontend/containers/frontend', '.']
-options:
-  logging: CLOUD_LOGGING_ONLY
-images:
-- 'us-central1-docker.pkg.dev/$PROJECT_ID/containers/frontend'
