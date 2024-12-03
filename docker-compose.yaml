@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: pgvector:17
+    ports:
+      - 5432:5432
+    volumes:
+      - /data/search/:/var/lib/postgresql/data/
+      - ./database/init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: content
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
