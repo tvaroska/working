@@ -1,29 +1,22 @@
 [tool.poetry]
-name = "search"
+name = "article"
 version = "0.1.0"
 description = ""
 authors = ["Boris Tvaroska <boris@tvaroska.sk>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-pgvector = "^0.3.6"
-pydantic = ">=2.9,<2.10"
-fastapi = {extras = ["standard"], version = "^0.115.5"}
+python = "^3.10"
 google-cloud-aiplatform = "^1.73.0"
-langchain-core = ">=0.3.15,<0.4"
-langchain-community = "^0.3.9"
+langchain-core = "^0.3.21"
 langchain-google-vertexai = "^2.0.8"
-alembic = "^1.14.0"
-sqlalchemy = "^2.0.36"
-psycopg = {extras = ["binary"], version = "^3.2.3"}
+mistune = "^3.0.2"
 
 
 [tool.poetry.group.dev.dependencies]
-jupyterlab = "^4.3.1"
+jupyterlab = "^4.3.2"
 ipywidgets = "^8.1.5"
-black = "^24.10.0"
-isort = "^5.13.2"
+tqdm = "^4.67.1"
 
 [build-system]
 requires = ["poetry-core"]
