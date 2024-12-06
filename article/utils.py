@@ -2,7 +2,7 @@ from typing import Dict
 from copy import deepcopy
 
 from langchain_core.prompt_values import ChatPromptValue
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 def flatten_openapi(schema: Dict) -> Dict:
     """
@@ -76,35 +76,55 @@ def flatten_openapi(schema: Dict) -> Dict:
     del schema['$defs']
     return schema
 
+def sections(schema):
+    response = ''
+    if not ('properties' in schema):
+        return None
+    for k,v in schema['properties'].items():
+        if v['type'] == 'string':
+            response += k.capitalize() + ', '
+        elif v['type'] == 'array':
+            subsections = sections(v['items'])
+            if subsections:
+                response += f'several {k.capitalize()} (subsections {subsections})' + ', '
+            else:
+                response += f'several {k.capitalize()}' + ', '
+                
+    return response
+
 
 def generate_extract(
-    prompt,
+    question,
     generate_model,
     schema,
     extract_model = None
 ):
-    if isinstance(prompt, str):
-        prompt = [HumanMessage(prompt)]
-    elif isinstance(prompt, HumanMessage):
-        prompt = [prompt]
-    elif isinstance(prompt, ChatPromptValue):
-        prompt = prompt.messages
-    elif isinstance(prompt, list):
-        prompt = deepcopy(prompt)
+    if isinstance(question, str):
+        prompt = [HumanMessage(question)]
+    elif isinstance(question, HumanMessage):
+        prompt = [question]
+    elif isinstance(question, ChatPromptValue):
+        prompt = question.messages
+    elif isinstance(question, list):
+        prompt = deepcopy(question)
     else:
         raise NotImplementedError
+
+    flat_schema=flatten_openapi(schema.schema())
+
+    prompt.append(SystemMessage(f'Create outputs in Markdown with sections (as headings) {sections(flat_schema)}'))
 
     if extract_model:
         l_extract_model = deepcopy(extract_model)
     else:
         l_extract_model = deepcopy(generate_model)
     l_extract_model = l_extract_model.with_structured_output(
-        flatten_openapi(schema.schema()), method='json_mode')
+        flat_schema, method='json_mode')
 
-    generated_text = generate_model.invoke(prompt)
-    prompt.append(generated_text)
-    prompt.append(HumanMessage('Extract informations'))
-    structured = l_extract_model.invoke(prompt)
+    generated_text = generate_model.invoke(question)
+    question.append(generated_text)
+    question.append(HumanMessage('Extract informations'))
+    structured = l_extract_model.invoke(question)
 
     result = schema.parse_obj(structured)
     
