@@ -1,0 +1,11 @@
+{
+    "dependencies": [
+        "langchain-community",
+        "langchain-google-vertexai",
+        "google-cloud-aiplatform",
+        "./agents"
+    ],
+    "graphs": {
+        "my_agent": "./agents/agent.py:app"
+    }
+}

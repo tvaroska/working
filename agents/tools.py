@@ -1,7 +1,12 @@
+from typing import Annotated, Optional, Dict, List, Union
+
 from datetime import date
-from typing import Optional, Dict, List, Union
-from langchain.tools import Tool
-from pydantic import BaseModel, Field
+from langchain.tools import tool
+from langgraph.types import Command
+from langchain_core.tools.base import InjectedToolCallId
+from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableConfig
+
 
 # Keep existing data structures
 USERS = [
@@ -70,7 +75,10 @@ class UserIdentificationError(Exception):
     """Custom exception for user identification errors"""
     pass
 
+@tool
 def identify_user(
+    tool_call_id: Annotated[str, InjectedToolCallId], 
+    config: RunnableConfig,
     first_name: str,
     last_name: str,
     credit_card_last_four: Optional[str] = None,
@@ -128,17 +136,30 @@ def identify_user(
         credit_accounts = [acc for acc in user_accounts if acc['type'] == 'CREDIT']
         for account in credit_accounts:
             if str(account['account_no'])[-4:] == credit_card_last_four:
-                return {"user_id": matching_user['id']}
+                x = Command(
+                    update={
+                        'user_id': matching_user['id'],
+                        'messages': [ToolMessage(f'User ID = {matching_user["id"]}', tool_call_id=tool_call_id)]
+                    }
+                )
+                return x
 
     # Check account last four if provided
     if account_last_four:
         non_credit_accounts = [acc for acc in user_accounts if acc['type'] in ['CHECKING', 'SAVINGS']]
         for account in non_credit_accounts:
             if str(account['account_no'])[-4:] == account_last_four:
-                return {"user_id": matching_user['id']}
+                print('Found with account No')
+                return Command(
+                    update={
+                        'user_id': matching_user['id'],
+                        'messages': [ToolMessage(f'User ID = {matching_user["id"]}', tool_call_id=tool_call_id)]
+                    }
+                )
     
     raise UserIdentificationError("User not found")
 
+@tool
 def get_user_details(user_id: int) -> Dict[str, Union[Dict, List]]:
     """
     Get user details and their accounts based on user ID.
@@ -170,31 +191,5 @@ def get_user_details(user_id: int) -> Dict[str, Union[Dict, List]]:
         "accounts": user_accounts
     }
 
-# Create LangChain tools
-identify_user_tool = Tool(
-    name="identify_user",
-    description="""
-    Identifies a user by their name and either the last 4 digits of their credit card or account number.
-    Required: first_name, last_name, and EITHER credit_card_last_four OR account_last_four.
-    Returns the user's ID if found.
-    """,
-    func=lambda args: identify_user(
-        first_name=args["first_name"],
-        last_name=args["last_name"],
-        credit_card_last_four=args.get("credit_card_last_four"),
-        account_last_four=args.get("account_last_four")
-    )
-)
-
-get_user_details_tool = Tool(
-    name="get_user_details",
-    description="""
-    Retrieves detailed information about a user and their accounts using their user ID.
-    Required: user_id (integer)
-    Returns user's personal information and all associated accounts.
-    """,
-    func=lambda user_id: get_user_details(int(user_id))
-)
-
 # List of all available tools
-tools = [identify_user_tool, get_user_details_tool]
+tools = [identify_user, get_user_details]

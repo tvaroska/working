@@ -14,7 +14,11 @@ langchain-community = "^0.3.12"
 langchain-google-vertexai = "^2.0.9"
 google-cloud-aiplatform = "^1.75.0"
 openapi-pydantic = "^0.5.0"
+langgraph = "^0.2.60"
 
+
+[tool.poetry.group.dev.dependencies]
+langgraph-cli = "^0.1.65"
 
 [build-system]
 requires = ["poetry-core"]
