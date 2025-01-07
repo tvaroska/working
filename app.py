@@ -1,10 +1,7 @@
+import json
+
 import flet as ft
 from flet import View, Page
-
-EXAMPLE = [
-    {'title': 'First', 'short': 'First article. This can be a bit longer than just a simple line', 'long': '## Long 1', 'url': 'https://www.twitter.com'},
-    {'title': 'Second', 'short': 'Just built a Perplexity clone using Gemini 2.0 + Grounding, and the wildest part? \n@Repli`s Agent wrote ALL the code in 2 hours!\nSearch anything, get sources, ask follow-ups.\nGoogle has all the pieces to make AI search incredible. Hope they productize it soon!\nDemo + code 👇', 'long': '### Long 2', 'url':'https://www.linkedin.com'},
-]
 
 def create_detail_view(page: Page, item: dict):
     def handle_back(e):
@@ -17,7 +14,7 @@ def create_detail_view(page: Page, item: dict):
             ft.Row(
                 controls=[
                     ft.IconButton(
-                        icon=ft.icons.ARROW_BACK,
+                        icon=ft.Icons.ARROW_BACK,
                         icon_color='#1a237e',
                         on_click=handle_back
                     ),
@@ -62,16 +59,17 @@ def create_detail_view(page: Page, item: dict):
     )
 
 async def main(page: ft.Page):
-    async def move(e):
-        pass
 
-    page.title = 'Weekly updates'
+    with open('latest.json') as f:
+        data = json.load(f)
+
+    page.title = f'Weekly updates date: {data["date"]}'
     page.bgcolor = '#f0f2f5'  # Light gray background
     
     items = ft.ListView(width=800)
     
     # Create containers for list items
-    for line in EXAMPLE:
+    for line in data["updates"]:
         container = ft.Container(
             on_click=lambda e: page.go(f'/detail/{e.control.content.controls[0].value}'),
             content=ft.Column(
@@ -90,7 +88,7 @@ async def main(page: ft.Page):
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=4,
-                color=ft.colors.with_opacity(0.25, 'black'),
+                color=ft.Colors.with_opacity(0.25, 'black'),
             ),
         )
         items.controls.append(container)
@@ -112,7 +110,7 @@ async def main(page: ft.Page):
             )
         else:
             # Add detail view
-            for item in EXAMPLE:
+            for item in data["updates"]:
                 if page.route == f'/detail/{item["title"]}':
                     page.views.append(create_detail_view(page, item))
                     break

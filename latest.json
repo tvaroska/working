@@ -1,0 +1,7 @@
+{
+    "date": "Jan 99, 2025",
+    "updates": [
+    {"title": "First", "short": "First article. This can be a bit longer than just a simple line", "long": "## Long 1", "url": "https://www.twitter.com"},
+    {"title": "Second", "short": "Just built a Perplexity clone using Gemini 2.0 + Grounding, and the wildest part? \n@Repli`s Agent wrote ALL the code in 2 hours!\nSearch anything, get sources, ask follow-ups.\nGoogle has all the pieces to make AI search incredible. Hope they productize it soon!\nDemo + code 👇", "long": "### Long 2", "url":"https://www.linkedin.com"}
+    ]
+}

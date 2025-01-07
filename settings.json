@@ -1,0 +1,19 @@
+{
+    "feeds":[
+        "https://magazine.sebastianraschka.com/feed",
+        "https://frontierai.substack.com/feed",
+        "https://jmcdonnell.substack.com/feed",
+        "https://www.interconnects.ai/feed",
+        "https://sergeylevine.substack.com/feed",
+        "https://mlopsroundup.substack.com/feed",
+        "https://blog.matt-rickard.com/feed",
+        "https://newsletter.ruder.io/feed",
+        "https://ontologist.substack.com/feed",
+        "https://planetocracy.org/feed",
+        "https://newsletter.pragmaticengineer.com/feed",
+        "https://solrashidi.substack.com/feed",
+        "https://fchollet.substack.com/feed",
+        "https://www.newsletter.swirlai.com/feed",
+        "https://hugobowne.substack.com/feed"
+    ]
+}
