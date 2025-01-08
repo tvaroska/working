@@ -10,9 +10,8 @@ python = "^3.10"
 flet = "^0.25.2"
 feedparser = "^6.0.11"
 tqdm = "^4.67.1"
-langchain-core = "^0.3.29"
-langchain-google-vertexai = "^2.0.9"
-vertexai = "^1.71.1"
+tenacity = "^9.0.0"
+google-genai = "^0.3.0"
 
 
 [build-system]
