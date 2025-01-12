@@ -76,7 +76,7 @@ async def main():
     with open('articles.json', 'w+') as f:
         json.dump(
             {"date": datetime.now().strftime("%b %d %Y"),
-             "updated": [
+             "updates": [
                  {
                      "title": item.title,
                      "short": item.short_summary,
