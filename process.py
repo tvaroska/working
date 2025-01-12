@@ -16,7 +16,7 @@ from google.genai.types import Part, GenerateContentConfig
 from google.genai.errors import ClientError
 
 # Logging setup
-logging.basicConfig(filename='collect.log', filemode='w', format='%(levelname)s:%(message)s', level=logging.DEBUG)
+logging.basicConfig(filename='collect.log', filemode='w', format='%(levelname)s:%(message)s', level=logging.ERROR)
 
 
 class Summary(BaseModel):
@@ -50,7 +50,7 @@ async def get_summary(article: Article) -> Article:
             if e.code == 429:
                 raise ResourceExaused(code=e.code, response = e.response) from e
             elif e.code == 400: # cannot load
-                logging.debug(msg=article.url)
+                logging.error(msg=article.url)
                 return None
             else:
                 raise ClientError(code=e.code, response=e.response) from e
@@ -74,7 +74,16 @@ async def main():
     updated_articles = await tqdm.gather(*tasks)
 
     with open('articles.json', 'w+') as f:
-        json.dump([item.model_dump_json() for item in updated_articles if item], f)
+        json.dump(
+            {"date": datetime.now().strftime("%b %d %Y"),
+             "updated": [
+                 {
+                     "title": item.title,
+                     "short": item.short_summary,
+                     "long": item.summary,
+                     "url": item.url
+                 } for item in updated_articles if item]
+            }, f)
 
 
 if __name__ == '__main__':

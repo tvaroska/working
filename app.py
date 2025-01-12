@@ -6,7 +6,7 @@ from flet import View, Page
 def create_detail_view(page: Page, item: dict):
     def handle_back(e):
         page.go('/')
-        
+
     content = ft.Container(
         url=item['url'],
         content=ft.Column(
@@ -60,7 +60,7 @@ def create_detail_view(page: Page, item: dict):
 
 async def main(page: ft.Page):
 
-    with open('latest.json') as f:
+    with open('articles.json') as f:
         data = json.load(f)
 
     page.title = f'Weekly updates date: {data["date"]}'
