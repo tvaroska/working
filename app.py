@@ -60,7 +60,7 @@ def create_detail_view(page: Page, item: dict):
 
 async def main(page: ft.Page):
 
-    with open('articles.json') as f:
+    with open('/data/articles.json') as f:
         data = json.load(f)
 
     page.title = f'Weekly updates date: {data["date"]}'
