@@ -1,7 +1,10 @@
+import os
 import json
 
 import flet as ft
 from flet import View, Page
+
+DATAFILE = '/data/articles.json'
 
 def create_detail_view(page: Page, item: dict):
     def handle_back(e):
@@ -60,7 +63,8 @@ def create_detail_view(page: Page, item: dict):
 
 async def main(page: ft.Page):
 
-    with open('/data/articles.json') as f:
+    fname = os.getenv('DATAFILE', DATAFILE)
+    with open(fname) as f:
         data = json.load(f)
 
     page.title = f'Weekly updates date: {data["date"]}'
