@@ -8,7 +8,7 @@ from typing import List, Optional, Union
 import feedparser
 import httpx
 from google import genai
-from google.genai.errors import ClientError
+from google.genai.errors import ClientError, ServerError
 from google.genai.types import GenerateContentConfig, Part
 from pydantic import BaseModel, Field
 from tenacity import (
@@ -20,7 +20,7 @@ from tenacity import (
 from tqdm.asyncio import tqdm
 
 # Common globals
-http_client = httpx.AsyncClient()
+http_client = httpx.AsyncClient(timeout=30.0)
 
 
 class Article(BaseModel):
@@ -44,7 +44,7 @@ class ResourceExaused(ClientError):
     pass
 
 
-semaphore = asyncio.Semaphore(10)
+llm_semaphore = asyncio.Semaphore(10)
 gemini = genai.Client(vertexai=True, location="us-central1")
 
 
@@ -66,9 +66,12 @@ async def get_article(entry, starting_point) -> Article:
             if "youtube.com" in entry.link:
                 media_type = "video/vnd.youtube.yt"
             else:
-                head = (await http_client.head(entry.link)).headers
-                if "Content-Type" in head:
-                    media_type = head["Content-Type"].split(";")[0]
+                try:
+                    head = (await http_client.head(entry.link)).headers
+                    if "Content-Type" in head:
+                        media_type = head["Content-Type"].split(";")[0]
+                except httpx.ConnectTimeout:
+                    return None
         else:
             # No link - no article
             return None
@@ -117,7 +120,7 @@ async def new_articles(feeds: List[str], starting_point: datetime) -> List[Artic
     retry=retry_if_exception_type(ResourceExaused),
 )
 async def get_summary(article: Article) -> Article:
-    async with semaphore:
+    async with llm_semaphore:
         try:
             response = await gemini.aio.models.generate_content(
                 model="gemini-1.5-flash-002",
@@ -138,6 +141,8 @@ async def get_summary(article: Article) -> Article:
                 return None
             else:
                 raise ClientError(code=e.code, response=e.response) from e
+        except ServerError:
+            return None
     summary = Summary.model_validate_json(response.text)
 
     article.short_summary = summary.short
@@ -153,9 +158,9 @@ async def main():
 
     starting_point = datetime.now() - timedelta(weeks=52)
     articles = await new_articles(data["feeds"], starting_point=starting_point)
-    tasks = [get_summary(article) for article in articles]
+    tasks = [get_summary(article) for article in articles[:3] if article]
 
-    updated_articles = await tqdm.gather(*tasks)
+    updated_articles = await asyncio.gather(*tasks)
 
     with open("articles.json", "w+") as f:
         json.dump(
