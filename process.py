@@ -1,6 +1,8 @@
 import asyncio
 import json
 import uuid
+import structlog
+import logging
 from datetime import datetime, timedelta
 from time import mktime
 from typing import List, Optional, Union
@@ -17,11 +19,13 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential_jitter,
 )
-from tqdm.asyncio import tqdm
 
 # Common globals
 http_client = httpx.AsyncClient(timeout=30.0)
-
+structlog.configure(
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+)
+log = structlog.get_logger()
 
 class Article(BaseModel):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
@@ -120,6 +124,7 @@ async def new_articles(feeds: List[str], starting_point: datetime) -> List[Artic
     retry=retry_if_exception_type(ResourceExaused),
 )
 async def get_summary(article: Article) -> Article:
+    log.bind(url=article.url)
     async with llm_semaphore:
         try:
             response = await gemini.aio.models.generate_content(
@@ -137,17 +142,20 @@ async def get_summary(article: Article) -> Article:
             if e.code == 429:
                 raise ResourceExaused(code=e.code, response=e.response) from e
             elif e.code == 400:
+                log.info("Block", code=400)
                 # cannot load, page blocked for robots
                 return None
             else:
                 raise ClientError(code=e.code, response=e.response) from e
         except ServerError:
+            log.info("Internal arror", code=400)
             return None
     summary = Summary.model_validate_json(response.text)
 
     article.short_summary = summary.short
     article.summary = summary.long
 
+    log.info("Success")
     return article
 
 
@@ -157,6 +165,7 @@ async def main():
         data = json.load(f)
 
     starting_point = datetime.now() - timedelta(weeks=52)
+    log.bind(starting_point = starting_point)
     articles = await new_articles(data["feeds"], starting_point=starting_point)
     tasks = [get_summary(article) for article in articles[:3] if article]
 
