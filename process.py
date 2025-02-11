@@ -20,12 +20,21 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-# Common globals
-http_client = httpx.AsyncClient(timeout=30.0)
 structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.add_log_level,
+        structlog.processors.EventRenamer("event"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.KeyValueRenderer(key_order=["level", "event", "num"])
+#        structlog.processors.JSONRenderer(key_order=["level", "event", "num"]),
+    ],
     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
 )
-log = structlog.get_logger()
+logger = structlog.get_logger()
 
 class Article(BaseModel):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
@@ -48,11 +57,10 @@ class ResourceExaused(ClientError):
     pass
 
 
-llm_semaphore = asyncio.Semaphore(10)
 gemini = genai.Client(vertexai=True, location="us-central1")
 
 
-async def get_article(entry, starting_point) -> Article:
+async def get_article(http_client: httpx.AsyncClient, entry, starting_point) -> Article:
     # Get published date from the entry
     if hasattr(entry, "published_parsed"):
         pub_date = datetime.fromtimestamp(mktime(entry.published_parsed))
@@ -92,7 +100,7 @@ async def get_article(entry, starting_point) -> Article:
         return None
 
 
-async def new_articles(feeds: List[str], starting_point: datetime) -> List[Article]:
+async def new_articles(http_client: httpx.AsyncClient, feeds: List[str], starting_point: datetime) -> List[Article]:
     """
     Function will check RSS feeds in feeds and return all entries which are new from starting_point
 
@@ -112,7 +120,7 @@ async def new_articles(feeds: List[str], starting_point: datetime) -> List[Artic
             print(f"Warning: Error parsing feed {feed_url}: {feed.bozo_exception}")
             continue
 
-        tasks += [get_article(entry, starting_point) for entry in feed.entries]
+        tasks += [get_article(http_client, entry, starting_point) for entry in feed.entries]
 
     response = await asyncio.gather(*tasks)
     return [article for article in response if article]
@@ -123,9 +131,10 @@ async def new_articles(feeds: List[str], starting_point: datetime) -> List[Artic
     wait=wait_exponential_jitter(initial=10, jitter=5),
     retry=retry_if_exception_type(ResourceExaused),
 )
-async def get_summary(article: Article) -> Article:
-    log.bind(url=article.url)
-    async with llm_semaphore:
+async def get_summary(semaphore: asyncio.Semaphore, article: Article) -> Article:
+    bound_logger = logger.bind(location="get_summary", url=article.url)
+    bound_logger.info("Processing article")
+    async with semaphore:
         try:
             response = await gemini.aio.models.generate_content(
                 model="gemini-1.5-flash-002",
@@ -142,52 +151,62 @@ async def get_summary(article: Article) -> Article:
             if e.code == 429:
                 raise ResourceExaused(code=e.code, response=e.response) from e
             elif e.code == 400:
-                log.info("Block", code=400)
+                bound_logger.info("Block", code=400)
                 # cannot load, page blocked for robots
                 return None
             else:
                 raise ClientError(code=e.code, response=e.response) from e
         except ServerError:
-            log.info("Internal arror", code=400)
+            bound_logger.info("Internal error", code=400)
             return None
-    summary = Summary.model_validate_json(response.text)
+        summary = Summary.model_validate_json(response.text)
 
-    article.short_summary = summary.short
-    article.summary = summary.long
+        article.short_summary = summary.short
+        article.summary = summary.long
 
-    log.info("Success")
-    return article
+        bound_logger.info("Success")
+        return article
 
 
 async def main():
+    bound_logger = logger.bind(location="main")
+    bound_logger.info("Starting process")
+    
+    # Create resources within the async context
+    async with httpx.AsyncClient(timeout=30.0) as http_client:
+        semaphore = asyncio.Semaphore(10)
+        
+        with open("settings.json") as f:
+            data = json.load(f)
 
-    with open("settings.json") as f:
-        data = json.load(f)
+        bound_logger.info("Read source feeds", num=len(data["feeds"]))
 
-    starting_point = datetime.now() - timedelta(weeks=52)
-    log.bind(starting_point = starting_point)
-    articles = await new_articles(data["feeds"], starting_point=starting_point)
-    tasks = [get_summary(article) for article in articles[:3] if article]
+        starting_point = datetime.now() - timedelta(weeks=52)
+        articles = await new_articles(http_client, data["feeds"], starting_point=starting_point)
 
-    updated_articles = await asyncio.gather(*tasks)
+        bound_logger.info("List of articles", num=len(articles), starting_point=starting_point)
 
-    with open("articles.json", "w+") as f:
-        json.dump(
-            {
-                "date": datetime.now().strftime("%b %d %Y"),
-                "updates": [
-                    {
-                        "title": item.title,
-                        "short": item.short_summary,
-                        "long": item.summary,
-                        "url": item.url,
-                    }
-                    for item in updated_articles
-                    if item
-                ],
-            },
-            f,
-        )
+        tasks = [get_summary(semaphore, article) for article in articles if article]
+
+        updated_articles = await asyncio.gather(*tasks)
+
+        with open("articles.json", "w+") as f:
+            json.dump(
+                {
+                    "date": datetime.now().strftime("%b %d %Y"),
+                    "updates": [
+                        {
+                            "title": item.title,
+                            "short": item.short_summary,
+                            "long": item.summary,
+                            "url": item.url,
+                        }
+                        for item in updated_articles
+                        if item
+                    ],
+                },
+                f,
+            )
 
 
 if __name__ == "__main__":
