@@ -4,7 +4,7 @@ import json
 import flet as ft
 from flet import View, Page
 
-DATAFILE = '/data/articles.json'
+DATAFILE = 'articles.json'
 
 def create_detail_view(page: Page, item: dict):
     def handle_back(e):

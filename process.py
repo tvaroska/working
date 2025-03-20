@@ -3,6 +3,7 @@ import json
 import uuid
 import structlog
 import logging
+import argparse
 from datetime import datetime, timedelta
 from time import mktime
 from typing import List, Optional, Union
@@ -131,13 +132,13 @@ async def new_articles(http_client: httpx.AsyncClient, feeds: List[str], startin
     wait=wait_exponential_jitter(initial=10, jitter=5),
     retry=retry_if_exception_type(ResourceExaused),
 )
-async def get_summary(semaphore: asyncio.Semaphore, article: Article) -> Article:
+async def get_summary(semaphore: asyncio.Semaphore, article: Article, model: str) -> Article:
     bound_logger = logger.bind(location="get_summary", url=article.url)
     bound_logger.info("Processing article")
     async with semaphore:
         try:
             response = await gemini.aio.models.generate_content(
-                model="gemini-1.5-flash-002",
+                model=model,
                 contents=[
                     Part.from_text("Analyze the article"),
                     Part.from_uri(article.url, mime_type=article.mime_type),
@@ -168,7 +169,7 @@ async def get_summary(semaphore: asyncio.Semaphore, article: Article) -> Article
         return article
 
 
-async def main():
+async def main(model: str, input_file: str, output_file: str):
     bound_logger = logger.bind(location="main")
     bound_logger.info("Starting process")
     
@@ -176,7 +177,7 @@ async def main():
     async with httpx.AsyncClient(timeout=30.0) as http_client:
         semaphore = asyncio.Semaphore(10)
         
-        with open("settings.json") as f:
+        with open(input_file) as f:
             data = json.load(f)
 
         bound_logger.info("Read source feeds", num=len(data["feeds"]))
@@ -186,11 +187,11 @@ async def main():
 
         bound_logger.info("List of articles", num=len(articles), starting_point=starting_point)
 
-        tasks = [get_summary(semaphore, article) for article in articles if article]
+        tasks = [get_summary(semaphore, article, model) for article in articles if article]
 
         updated_articles = await asyncio.gather(*tasks)
 
-        with open("articles.json", "w+") as f:
+        with open(output_file, "w+") as f:
             json.dump(
                 {
                     "date": datetime.now().strftime("%b %d %Y"),
@@ -209,5 +210,17 @@ async def main():
             )
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Process RSS feeds and generate article summaries using Gemini API")
+    parser.add_argument("--model", type=str, default="gemini-2.0-flash-001", 
+                        help="Gemini model to use for summarization (default: gemini-2.0-flash-001)")
+    parser.add_argument("--input", type=str, default="settings.json", 
+                        help="Input JSON file containing RSS feed URLs (default: settings.json)")
+    parser.add_argument("--output", type=str, default="articles.json", 
+                        help="Output JSON file to store processed articles (default: articles.json)")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    args = parse_arguments()
+    asyncio.run(main(args.model, args.input, args.output))
