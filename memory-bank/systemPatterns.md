@@ -2,7 +2,7 @@
 
 ## System Architecture
 
-The system follows a data pipeline architecture with three main components:
+The weekly updates aggregator follows a data pipeline architecture with three main components:
 
 ```mermaid
 flowchart TD
@@ -31,14 +31,14 @@ flowchart TD
 ## Key Technical Decisions
 
 ### 1. Data Collection & Processing
-- **RSS Feed Integration**: Uses `feedparser` to collect articles from specified RSS feeds
+- **RSS Feed Integration**: Uses `feedparser` to collect content from user-defined RSS feeds (newsletters, substack, youtube channels, podcasts, blogs, etc.)
 - **Asynchronous Processing**: Leverages `asyncio` for efficient concurrent processing of multiple feeds
 - **HTTP Client**: Uses `httpx` for asynchronous HTTP requests to fetch article content
 - **Error Handling**: Implements robust error handling with `tenacity` for retries on failures
-- **Caching**: Avoids duplicate processing by tracking previously processed articles
+- **Caching**: Avoids duplicate processing by tracking previously processed content
 
 ### 2. AI Processing
-- **Google Vertex AI**: Leverages Google's Generative AI models for content summarization
+- **Google Vertex AI**: Leverages Google's Generative AI models to create both short and long-form summaries
 - **Batched Processing**: Processes articles in batches with rate limiting to manage API costs
 - **Schema Validation**: Uses `pydantic` models to enforce structured summary formats
 - **Retry Logic**: Implements exponential backoff for API calls to handle service limitations
@@ -47,37 +47,40 @@ flowchart TD
 - **Flet Framework**: Uses Flet (Flutter-based Python framework) for the web UI
 - **Responsive Design**: Implements adaptive layouts for different screen sizes
 - **Client-Side Routing**: Enables navigation between list and detail views without page reload
-- **Material Design**: Follows Material Design principles for consistent user experience
+- **Material Design**: Follows Material Design principles for a clean, user-friendly experience
+- **Access to Original Content**: Provides links to view original articles
 
 ## Component Relationships
 
 ### Article Processing Pipeline
 1. **Collection Stage**:
-   - Reads feed URLs from `settings.json`
-   - Parses each feed to extract articles
+   - Reads user-defined feed URLs from `settings.json`
+   - Parses each feed to extract articles from diverse content sources
    - Filters articles based on publication date
 
 2. **Processing Stage**:
    - Prepares content for AI processing
    - Sends to Google Vertex AI for summarization
-   - Generates both short and long-form summaries
+   - Generates both short and long-form summaries for different viewing contexts
 
 3. **Storage Stage**:
    - Stores processed articles in `articles.json`
-   - Includes metadata, summaries, and URLs
+   - Includes metadata, summaries, and URLs to original content
 
 ### Web Application Flow
 1. **Initialization**:
-   - Loads article data from JSON file
+   - Loads aggregated article data from JSON file
    - Sets up UI components and routes
 
 2. **List View**:
    - Displays article cards with title and short summary
    - Implements click handlers for navigation
+   - Presents a browsable collection of updates from all sources
 
 3. **Detail View**:
    - Shows article title, long summary, and source link
    - Provides back navigation to list view
+   - Enables users to navigate to original content
 
 ## Design Patterns
 
