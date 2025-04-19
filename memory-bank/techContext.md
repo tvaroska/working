@@ -10,18 +10,19 @@
 - **asyncio**: For asynchronous I/O operations and concurrent processing
 - **feedparser**: To parse and extract content from RSS feeds
 - **httpx**: Modern asynchronous HTTP client for Python
-- **Google Vertex AI**: Cloud-based AI platform for generative text processing
+- **Google Vertex AI**: Cloud-based AI platform for generative text processing (using Gemini models)
 - **Pydantic**: For data validation and settings management
 - **structlog**: Structured logging for better observability
 - **tenacity**: Retry library for handling transient failures
+- **argparse**: Command-line argument parsing for flexible configuration
 
 ### Storage & Data Format
-- **JSON**: Used for both configuration (`settings.json`) and data storage (`articles.json`)
-- **Markdown**: Used for formatting long-form article summaries
+- **JSON**: Used for both configuration (`settings.json`) and data storage (`articles.json` and `latest.json`)
+- **Markdown**: Used for formatting long-form article summaries in the UI
 
 ### Deployment & Containerization
-- **Docker**: For containerized deployment and consistent runtime environments
-- **UV**: Modern Python package manager for dependency management
+- **Docker**: For containerized deployment and consistent runtime environments using multi-stage builds
+- **UV**: Modern Python package manager for dependency management (used in the Docker build process)
 
 ## Development Setup
 
@@ -44,9 +45,15 @@ python process.py
 python app.py
 ```
 
+### Command-line Options
+The process.py script supports several command-line options:
+- `--model`: Specify the Gemini model to use (default: gemini-2.0-flash-001)
+- `--input`: Specify the input settings file (default: settings.json)
+- `--output`: Specify the output file for processed articles (default: articles.json)
+
 ### Environment Variables
 - `DATAFILE`: Optional override for the data file path (default: `articles.json`)
-- `OPENWEATHER_API_KEY`: Required for Google Vertex AI authentication
+- `VERTEX_AI_LOCATION`: Location for the Vertex AI API (default: us-central1)
 
 ### Configuration Files
 - `settings.json`: Contains RSS feed URLs and other configuration parameters
@@ -58,11 +65,13 @@ python app.py
 ### API Limitations
 - **Google Vertex AI Quotas**: Limited by API rate limits and quotas
 - **Cost Considerations**: Pay-per-use model for AI API calls
+- **Rate Limiting**: Implemented via semaphores (currently set to 10 concurrent requests)
 
 ### Performance Considerations
 - **Memory Usage**: Flet applications may have higher memory usage than traditional web servers
 - **Network Dependency**: Relies on stable network connections for feed fetching and API calls
 - **Rate Limiting**: Must implement rate limiting to avoid API throttling
+- **Processing Time**: Initial content collection and processing can be time-intensive
 
 ### Security Aspects
 - **API Credentials**: Requires secure handling of API keys
@@ -110,6 +119,7 @@ mypy
 - **End-to-End Tests**: For validating the web interface
 
 ## Monitoring & Logging
-- Uses `structlog` for structured logging
-- Contextual information added to logs for better debugging
+- Uses `structlog` for structured logging with contextual information
 - Configurable log levels and processors
+- Contextual binding for better traceability across components
+- Exception handling with proper logging
