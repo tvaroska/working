@@ -9,7 +9,7 @@ People with specific interests and professionals across various fields face chal
 
 ## Solution 
 This product solves these challenges by creating a centralized hub for content from any user-defined interest areas:
-- Automatically aggregates content from user-defined RSS feeds across any topic
+- Automatically aggregates content from user-defined RSS feeds and email newsletters across any topic
 - Uses AI (Google Vertex AI) to generate both concise and detailed summaries
 - Presents information in a clean, user-friendly interface
 - Enables efficient consumption of multiple sources in one place
