@@ -1,19 +1,36 @@
 # Web Signup User Journey - Simplified Onboarding
 
-## User Story: From Discovery to First Value
+## 1. Overview & Context
 
-### Primary User: Dr. Elena Vasquez (AI Engineer Persona)
-*Discovers the service through an AI Twitter discussion, wants to streamline her research workflow*
+### Target Personas
+- **Primary:** Dr. Elena Vasquez (AI Engineer) - 60% desktop, 40% mobile usage
+- **Secondary:** All personas during initial discovery and signup phase
+- **Use Case:** Web-based user acquisition, onboarding, and conversion to mobile app
 
----
+### Business Objectives
+- Minimize signup friction while maximizing conversion
+- Demonstrate immediate value within first session
+- Drive mobile app adoption for daily usage
+- Convert free users to premium through strategic upgrade prompts
 
-## 1. Landing & Discovery Phase
+### Success Metrics
+- Landing page to signup conversion: 15% target
+- Signup to email verification: 85% target
+- First session engagement: 95% reach content interaction
+- Day 7 retention: 40% active users
+- Premium conversion: 15-20% within 30 days
 
-### Initial Landing
+## 2. User Journey Flow
+
+### Primary Path: Web Discovery to First Value
+
+#### Step-by-Step Breakdown
+
+**1. Initial Landing**
 ```
 Landing Page Visit
 ├── Value Proposition (5 seconds to understand)
-│   ├── "AI-powered summaries for 500+ newsletters & podcasts"
+│   ├── "AI Summaries for 500+ newsletters & podcasts"
 │   ├── "Get caught up in minutes, not hours"
 │   └── Visual: Split screen showing cluttered inbox vs clean dashboard
 ├── Social Proof
@@ -23,16 +40,16 @@ Landing Page Visit
 └── Primary CTA: "Start Free - No Credit Card Required"
 ```
 
-### Pre-Signup Engagement
+**2. Pre-Signup Engagement**
 ```
 Interest Signals
 ├── Browse Popular Sources (No signup required)
 │   ├── Grid view of newsletter/podcast logos
-│   ├── Hover to see sample summaries
+│   ├── Hover to see sample AI summaries
 │   ├── Filter by category (AI/ML, Business, Tech)
 │   └── "500+ sources ready immediately"
 ├── Demo Content Preview
-│   ├── Real summary examples
+│   ├── Real AI Summary examples
 │   ├── "This is what you'll get" messaging
 │   └── Time savings calculator
 └── Problem Validation
@@ -43,9 +60,9 @@ Interest Signals
 
 ---
 
-## 2. Simplified Signup Flow
+#### Simplified Signup Flow
 
-### Step 1: Essential Information Only
+**Step 1: Essential Information Only**
 ```
 Signup Options (Single Page)
 ├── OAuth Authentication (Recommended)
@@ -82,7 +99,7 @@ Signup Options (Single Page)
 - Single page, under 30 seconds to complete
 - Mobile-responsive design
 
-### Step 2: Authentication Flow
+**Step 2: Authentication Flow**
 ```
 OAuth Flow (Google/Spotify/Twitter/LinkedIn/GitHub)
 ├── OAuth Provider Authentication
@@ -108,7 +125,7 @@ Email Signup Flow (Fallback)
 │   ├── Clear next steps
 │   └── Option to resend after 60 seconds
 ├── Magic Link Email
-│   ├── Subject: "Your AI content dashboard is ready"
+│   ├── Subject: "Your AI content Dashboard is ready"
 │   ├── Single prominent CTA button
 │   ├── Link expires in 15 minutes
 │   └── Preview of what awaits inside
@@ -120,13 +137,18 @@ Email Signup Flow (Fallback)
 
 ---
 
-## 3. Immediate Value Onboarding
+### Alternative Scenarios
+*[Cross-reference: See primary_user_journey.md for daily usage scenarios after onboarding]*
 
-### Step 3: Source Selection (Gamified)
+## 3. Detailed Interactions
+
+### UI/UX Specifications
+
+#### Step 3: Source Selection (Gamified)
 ```
 Source Selection Screen
 ├── Header Message
-│   ├── "Let's build your personalized feed"
+│   ├── "Let's build your personalized Feed"
 │   ├── "Choose a prepared menu or pick individual sources"
 │   └── Progress indicator: "Step 1 of 2"
 ├── Three-Tab Layout
@@ -247,7 +269,7 @@ Source Selection Screen
 - Martin Fowler's Blog, Joel on Software
 - The Pragmatic Engineer
 
-### Step 4: Notification Preferences (Minimal)
+#### Step 4: Notification Preferences (Minimal)
 ```
 Notification Setup
 ├── Header: "How often should we update you?"
@@ -269,24 +291,28 @@ Notification Setup
 
 ---
 
-## 4. First Session Experience
+### Technical Requirements
 
-### Welcome Dashboard
+#### First Session Experience
+
+**Welcome Dashboard**
 ```
 First Dashboard Load
 ├── Personal Welcome
-│   ├── "Welcome Elena! Your AI research feed is ready"
+│   ├── "Welcome Elena! Your AI research Feed is ready"
 │   ├── Sources being processed indicator
 │   └── Time to first content: "2 minutes"
 ├── Immediate Content Display
-│   ├── 5-8 pre-loaded summaries from selected sources
+│   ├── 5-8 pre-loaded AI summaries from selected sources
 │   ├── AI confidence scores visible
 │   ├── "This is from today's arXiv submissions" context
-│   └── Reading time estimates
+│   ├── Reading time estimates
+│   └── Offline availability indicators (download icons)
 ├── Quick Tutorial Overlay (Dismissible)
-│   ├── "Click any summary to expand"
+│   ├── "Click any AI Summary to expand"
 │   ├── "Save interesting articles with the star"
-│   ├── "Your feed learns from your choices"
+│   ├── "Your Feed learns from your choices"
+│   ├── "Download for offline reading"
 │   └── "Skip tutorial" option
 └── Success Metrics
     ├── "You would have spent 2.5 hours reading this manually"
@@ -294,16 +320,16 @@ First Dashboard Load
     └── "15 minutes saved already"
 ```
 
-### Content Interaction Flow
+**Content Interaction Flow**
 ```
 First Article Interaction
 ├── Summary Card Click
-│   ├── Expanded summary view
+│   ├── Expanded AI Summary view
 │   ├── Key findings highlighted
 │   ├── Relevance explanation ("Why this matters to AI engineers")
 │   └── Actions: Save, Share, Read Full Paper
 ├── Feedback Capture
-│   ├── "Was this summary helpful?" (thumbs up/down)
+│   ├── "Was this AI Summary helpful?" (thumbs up/down)
 │   ├── "Should we show more like this?" 
 │   └── Learning algorithm adjustment
 ├── Cross-Content Connections
@@ -311,16 +337,29 @@ First Article Interaction
 │   ├── "3 other researchers discussing this on Twitter"
 │   └── "Mentioned in Latent Space Podcast"
 └── Next Steps Suggestion
-    ├── "Explore more AI research summaries"
-    ├── "Add more sources to your feed"
+    ├── "Explore more AI research AI summaries"
+    ├── "Add more sources to your Feed"
     └── "Upgrade for custom source processing"
 ```
 
 ---
 
-## 5. Conversion Moments
+## 4. Cross-Platform Considerations
 
-### Free Tier Limitations
+### Web Experience
+Primary platform for initial discovery, signup, and onboarding detailed in this document
+
+### Mobile Experience
+*[Cross-reference: See mobile_app_flow.md for comprehensive mobile functionality]*
+
+### Offline Scenarios
+*[Detailed in PWA section below and mobile_app_flow.md section 7]*
+
+## 5. Business Logic
+
+### Conversion Points
+
+#### Free Tier Limitations
 ```
 Premium Upgrade Triggers
 ├── Custom Source Request
@@ -329,10 +368,10 @@ Premium Upgrade Triggers
 │   ├── Preview of additional features
 │   └── "Try premium free for 7 days"
 ├── Advanced Features
-│   ├── After 10 summaries read: "Unlock unlimited summaries"
+│   ├── After 10 AI summaries read: "Unlock unlimited AI summaries"
 │   ├── Search functionality: "Search across all your content"
 │   ├── Export features: "Export to your research tools"
-│   └── Team sharing: "Share feeds with your research team"
+│   └── Team sharing: "Share Feeds with your research team"
 └── Success-Based Upsell
     ├── "You've saved 5 hours this week!"
     ├── "Researchers like you save 10+ hours with premium"
@@ -340,7 +379,7 @@ Premium Upgrade Triggers
     └── Social proof: "Join 1,000+ premium researchers"
 ```
 
-### Upgrade Flow (Simplified)
+#### Upgrade Flow (Simplified)
 ```
 Premium Subscription
 ├── Plan Selection
@@ -361,9 +400,34 @@ Premium Subscription
 
 ---
 
-## 6. Retention & Engagement
+### Engagement Metrics
+- Onboarding completion rates by step
+- Time to first content interaction
+- Source selection patterns and preferences
+- Premium feature interest signals
 
-### Day 1 Follow-up
+### Retention Strategies
+- Progressive value delivery during onboarding
+- Strategic premium upgrade prompts
+- Mobile app transition incentives
+- Email nurture sequences
+
+## 6. Technical Implementation
+
+### System Requirements
+*[Cross-reference: See mobile_app_flow.md section 6 for technical specifications]*
+
+### Performance Considerations
+- Landing page load time under 3 seconds
+- PWA functionality for mobile users
+- OAuth integration reliability
+
+### Error States & Recovery
+- Signup flow failure recovery
+- Email verification retry mechanisms
+- OAuth provider fallback options
+
+#### Day 1 Follow-up
 ```
 First Day Email Sequence
 ├── Welcome Email (sent after signup)
@@ -372,18 +436,18 @@ First Day Email Sequence
 │   ├── Link back to dashboard
 │   └── Support contact information
 ├── Content Ready Notification (2 hours later)
-│   ├── "5 new AI research summaries ready"
-│   ├── Preview of top summary
+│   ├── "5 new AI research AI summaries ready"
+│   ├── Preview of top AI Summary
 │   ├── Click through to dashboard
 │   └── Mobile app download link
 └── End of Day Check-in
     ├── "How was your first day?"
-    ├── Usage stats: "You read 8 summaries in 12 minutes"
+    ├── Usage stats: "You read 8 AI summaries in 12 minutes"
     ├── "Questions? Reply to this email"
     └── Tomorrow's content preview
 ```
 
-### Week 1 Onboarding Sequence
+#### Week 1 Onboarding Sequence
 ```
 Progressive Engagement
 ├── Day 2: Feature Discovery
@@ -407,89 +471,79 @@ Progressive Engagement
 
 ---
 
-## 7. Success Metrics & KPIs
+## 7. Success Criteria & KPIs
 
-### Onboarding Funnel
-```
-Conversion Tracking
-├── Landing Page → Signup: 15% target
-├── Signup → Email Verification: 85% target
-├── Email Verification → Source Selection: 90% target
-├── Source Selection → First Session: 95% target
-├── First Session → Day 2 Return: 60% target
-└── Day 2 Return → Week 1 Active: 40% target
-```
+- **Onboarding Completion:** 95% reach first content interaction
+- **Time to Value:** Under 5 minutes to first "aha" moment
+- **User Satisfaction:** Positive sentiment during first session
+- **Source Selection:** 5-8 sources chosen on average
+- **Content Engagement:** First article saved within session
 
-### Engagement Metrics
-```
-User Activation Indicators
-├── Sources Selected (target: 5-8)
-├── First Summary Read (within 5 minutes)
-├── First Article Saved (within first session)
-├── Return Visit (within 24 hours)
-├── Premium Feature Interest (custom source request)
-└── Referral Behavior (sharing content)
-```
+### Business Metrics
+- **Conversion Funnel:** 15% landing → signup, 85% signup → verification
+- **Retention Rates:** 60% day 2 return, 40% week 1 active
+- **Premium Conversion:** 15-20% within 30 days
+- **Mobile App Adoption:** 70% transition to mobile within 14 days
+- **Referral Behavior:** Content sharing drives organic growth
 
-### Time-to-Value Measurement
-```
-Success Benchmarks
-├── Time to First Content: Under 2 minutes
-├── Time to First "Aha" Moment: Under 5 minutes
-├── Time to Habit Formation: 7-10 days
-├── Time to Premium Conversion: 14-21 days
-└── Time to Advocacy: 30+ days
-```
+### Technical Metrics
+- **Performance:** Landing page loads under 3 seconds
+- **Reliability:** 99%+ OAuth authentication success rate
+- **PWA Adoption:** Progressive web app installation rates
+- **Cross-Platform Sync:** Zero data loss during transitions
 
 ---
 
-## 8. Mobile Transition Strategy
+### Mobile Transition Strategy
 
-### Cross-Platform Continuity
+#### Cross-Platform Continuity
 ```
 Mobile App Introduction
 ├── Week 2 Email: "Take your feed mobile"
-├── Dashboard Banner: "Get the mobile app"
+├── Dashboard Banner: "Get the mobile App"
 ├── QR Code for easy download
 ├── Seamless sync promise
 ├── Offline reading benefits
 └── Push notification setup
 ```
 
-### Progressive Web App (PWA) Option
+#### Progressive Web App (PWA) Option
 ```
 Immediate Mobile Experience
 ├── "Add to Home Screen" prompt
 ├── Offline reading capability
 ├── Push notifications
 ├── Native app-like experience
-├── No app store download required
+├── No App store download required
 └── Full feature parity with web
 ```
 
----
-
-## Design Principles Summary
-
-### Simplicity Focus
-- **One-click actions** wherever possible
-- **Progressive disclosure** of complexity
-- **Visual hierarchy** guides attention
-- **Mobile-first** responsive design
-- **Accessibility** compliance throughout
-
-### Trust Building
-- **Social proof** at every step
-- **Transparent pricing** and features
-- **Clear data usage** policies
-- **Easy cancellation** processes
-- **Responsive support** channels
-
-### Immediate Value
-- **Content available instantly** after signup
-- **Personalization begins immediately**
-- **Time savings clearly communicated**
-- **Success metrics prominently displayed**
-- **Learning algorithm** adapts quickly
+**PWA Offline Capabilities**
+```
+Offline-First PWA Design
+├── Service Worker Implementation
+│   ├── Background content caching
+│   ├── Offline API request queuing
+│   ├── Automatic cache updates
+│   └── Fallback content delivery
+├── Initial Offline Setup
+│   ├── First-visit content pre-loading
+│   ├── Essential app shell caching
+│   ├── User preference storage
+│   └── Offline indicator setup
+├── Ongoing Offline Support
+│   ├── Incremental content updates
+│   ├── Action queuing for later sync
+│   ├── Local storage management
+│   └── Cross-session persistence
+└── Mobile App Transition
+    ├── Seamless data migration
+    ├── Preserved offline content
+    ├── Consistent user experience
+    └── Enhanced offline features in native app
+```
 
 This simplified onboarding flow reduces friction while maximizing immediate value delivery, setting users up for long-term engagement and eventual premium conversion.
+
+*[Cross-references: See primary_user_journey.md for daily usage patterns and mobile_app_flow.md for comprehensive mobile functionality]*
+

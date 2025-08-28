@@ -29,9 +29,23 @@
 
 **Usage Patterns:**
 - Checks app 2-3 times daily (morning commute, lunch, evening)
-- Prefers summaries over full content initially
-- Wants to bookmark important items for later
+- Prefers AI summaries over full content initially
+- Wants to save important items for later
 - Needs offline access for subway commute
+
+**Platform Preferences:**
+- **Mobile (80% of usage):** Primary device for commute consumption
+  - iPhone preferred for one-handed reading on public transit
+  - Relies heavily on offline download capabilities
+  - Uses swipe gestures for quick triage (save/dismiss)
+  - Prefers audio AI summaries during walking portions of commute
+  - Downloads content overnight on WiFi for day's consumption
+- **Desktop (20% of usage):** Deep-dive reading at work
+  - Uses web app during lunch breaks for detailed article reading
+  - Prefers larger screen for complex industry reports
+  - Shares content to team Slack directly from web interface
+  - Uses multiple tabs to cross-reference related articles
+  - Takes notes and highlights for meeting preparation
 
 **Success Criteria:**
 - Reduces content consumption time by 60%
@@ -68,10 +82,24 @@
 
 **Usage Patterns:**
 - Heavy usage during travel (airports, flights, hotels)
-- Prefers audio summaries over reading
+- Prefers audio AI summaries over reading
 - Needs quick scanning capability
 - Values content categorization and filtering
 - Wants sharing/forwarding capabilities
+
+**Platform Preferences:**
+- **Mobile (70% of usage):** Travel-optimized consumption
+  - iPad preferred for airport/hotel reading with larger screen
+  - iPhone for quick updates during taxi/Uber rides
+  - Heavy reliance on offline downloads due to inconsistent connectivity
+  - Uses voice-to-text for sharing insights while walking through airports
+  - Prefers landscape orientation for comfortable reading during flights
+- **Desktop (30% of usage):** Strategic planning and team sharing
+  - Uses web app in office for comprehensive content review
+  - Bulk sharing of content to team via email integration
+  - Creates custom content collections for upcoming presentations
+  - Uses keyboard shortcuts for efficient content processing
+  - Integrates with calendar to schedule content review sessions
 
 **Success Criteria:**
 - Maximizes productivity during travel time
@@ -111,9 +139,24 @@
 - Checks arXiv alerts multiple times daily
 - Scrolls AI Twitter during breaks and commute
 - Listens to podcasts during workouts and walks
-- Wants technical summaries with key algorithmic insights
-- Needs to bookmark and categorize content by research area
+- Wants technical AI summaries with key algorithmic insights
+- Needs to save and categorize content by research area
 - Prefers content tagged by AI subfield (NLP, computer vision, etc.)
+
+**Platform Preferences:**
+- **Desktop (60% of usage):** Research-focused deep dives
+  - Uses web app with multiple monitors for paper analysis
+  - Prefers split-screen view: AI summary alongside original paper
+  - Heavy use of search and filtering by AI subfield tags
+  - Integrates with reference management tools (Zotero, Mendeley)
+  - Uses browser extensions for direct export to research tools
+  - Keyboard shortcuts essential for rapid paper triage
+- **Mobile (40% of usage):** Discovery and lightweight consumption
+  - iPhone for arXiv alerts and Twitter feed monitoring during commute
+  - Quick paper saving for later desktop analysis
+  - Podcast listening during gym sessions with skip-to-segments feature
+  - Uses voice notes to capture research ideas triggered by AI summaries
+  - Relies on notification badges to track unread priority papers
 
 **Success Criteria:**
 - Never misses breakthrough research in area of expertise
@@ -152,9 +195,23 @@
 **Usage Patterns:**
 - Uses app throughout the day in short bursts
 - Reads during breaks, lunch, and before bed
-- Prefers detailed summaries with links to dive deeper
+- Prefers detailed AI summaries with links to dive deeper
 - Wants tagging and search functionality
 - Values recommendation engine for discovery
+
+**Platform Preferences:**
+- **Mobile (55% of usage):** Flexible, on-the-go learning
+  - Android phone for micro-learning during work breaks
+  - Uses both portrait and landscape modes depending on content type
+  - Heavy use of Read Later queue for weekend batch processing
+  - Prefers progressive web app for cross-device sync without app store
+  - Uses voice search for hands-free content discovery while coding
+- **Desktop (45% of usage):** Structured learning and note-taking
+  - Uses web app for comprehensive weekend learning sessions
+  - Multiple browser tabs for connecting concepts across disciplines
+  - Takes detailed notes and creates mind maps from content
+  - Uses saving system to build personal knowledge base
+  - Integrates with productivity tools (Notion, Obsidian) for knowledge management
 
 **Success Criteria:**
 - Maintains learning momentum without overwhelm
@@ -184,6 +241,20 @@
 - Find unique angles and underreported stories
 - Build authority through well-informed content
 
+**Platform Preferences:**
+- **Desktop (65% of usage):** Content creation and analysis
+  - Uses web app for comprehensive research sessions
+  - Multiple monitors for content comparison and analysis
+  - Heavy use of export features to writing tools (Notion, Google Docs)
+  - Uses advanced search and filtering for trend identification
+  - Integrates with social media scheduling tools
+- **Mobile (35% of usage):** Real-time monitoring and inspiration capture
+  - iPhone for breaking news alerts and trend monitoring
+  - Quick content saving during commute or travel
+  - Uses voice notes to capture content ideas on-the-go
+  - Social sharing directly from mobile for time-sensitive insights
+  - Notification customization for competitive intelligence
+
 ### 6. The Casual Consumer
 **Name:** Taylor Kim  
 **Age:** 35  
@@ -201,6 +272,20 @@
 - Weekend catching up on interesting topics
 - Discover new perspectives without commitment
 - Feel connected to broader conversations
+
+**Platform Preferences:**
+- **Mobile (40% of usage):** Casual browsing and discovery
+  - iPad for comfortable weekend reading sessions
+  - iPhone for occasional quick checks during weekdays
+  - Prefers simplified interface with minimal options
+  - Uses Read Later queue to avoid pressure during busy weekdays
+  - Relies on digest notifications rather than real-time alerts
+- **Desktop (60% of usage):** Relaxed deep-dive sessions
+  - Uses web app for unhurried weekend exploration
+  - Prefers full articles over AI summaries when time allows
+  - Uses larger screen for comfortable long-form reading
+  - Saves interesting topics for future exploration
+  - Values clean, distraction-free reading interface
 
 ## Market Analysis
 
@@ -223,13 +308,13 @@
 
 ### Common Pain Points Across Personas
 1. **Information Overload:** All personas struggle with too much content
-2. **Time Constraints:** Everyone values efficiency and summarization
+2. **Time Constraints:** Everyone values efficiency and AI summarization
 3. **Context Switching:** Moving between platforms is inefficient
 4. **Discovery vs. Depth:** Balance between breadth and deep dives
 5. **Mobile-First:** Primary consumption happens on mobile devices
 
 ### Differentiation Opportunities
-1. **AI-Powered Summarization:** Beyond simple excerpts
+1. **AI Summarization:** Beyond simple excerpts
 2. **Cross-Content Connections:** Link related topics across sources
 3. **Personalized Prioritization:** Learn individual preferences
 4. **Offline-First Design:** Reliable access regardless of connectivity

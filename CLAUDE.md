@@ -4,3 +4,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @.clinerules/AGENTS.md
 @.clinerules/project_structure.md
+@.clinerules/interactions_structure.md
