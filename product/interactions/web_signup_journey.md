@@ -313,6 +313,7 @@ First Dashboard Load
 │   ├── "Save interesting articles with the star"
 │   ├── "Your Feed learns from your choices"
 │   ├── "Download for offline reading"
+│   ├── "Toggle between reading and listening modes"
 │   └── "Skip tutorial" option
 └── Success Metrics
     ├── "You would have spent 2.5 hours reading this manually"
@@ -364,6 +365,7 @@ Primary platform for initial discovery, signup, and onboarding detailed in this 
 Premium Upgrade Triggers
 ├── Custom Source Request
 │   ├── "Want to add your private research feeds?"
+│   ├── "Unlock audio summaries for hands-free learning"
 │   ├── "Premium users get custom sources in 24 hours"
 │   ├── Preview of additional features
 │   └── "Try premium free for 7 days"

@@ -102,7 +102,8 @@ Content Dashboard
 │   │   ├── Source Logo + Name
 │   │   ├── Article Title
 │   │   ├── AI Summary Preview (2 lines)
-│   │   ├── Read Time Estimate
+│   │   ├── Audio/Text toggle indicator
+│   │   ├── Read/Listen Time Estimate
 │   │   ├── Priority Badge
 │   │   └── Action Buttons (Save, Share, Dismiss)
 │   └── Podcast Items
@@ -123,7 +124,9 @@ Content Dashboard
 ```
 Newsletter Item Tap
 ├── Summary View (Default)
+│   ├── Format Toggle (Text/Audio)
 │   ├── Full AI Summary (3-5 paragraphs)
+│   ├── Audio playback controls (when in audio mode)
 │   ├── Key Takeaways (bullet points)
 │   ├── Related Articles
 │   ├── Source Analysis (credibility/bias indicators)
@@ -215,10 +218,11 @@ Discover Tab
 Newsletter Article Flow
 ├── AI Summary Mode (Default)
 │   ├── AI Summary at top
+│   ├── Audio playback option with speed controls
 │   ├── Key points with source quotes
 │   ├── Sentiment analysis
 │   ├── Fact-checking indicators
-│   └── 30-second read guarantee
+│   └── 30-second read/listen guarantee
 ├── Scan Mode
 │   ├── Bullet point format
 │   ├── Highlighted key terms
@@ -230,10 +234,11 @@ Newsletter Article Flow
 │   ├── Auto-scroll option
 │   └── Note-taking capability
 └── Audio Mode
-    ├── Text-to-speech with natural voice
-    ├── Playback speed control
-    ├── Hands-free operation
-    └── Synchronized highlighting
+    ├── AI-generated natural voice narration
+    ├── Playback speed control (0.5x - 2x)
+    ├── Hands-free operation with voice commands
+    ├── Synchronized highlighting of text
+    └── Background playback capability
 ```
 
 **Podcast Listening Experience**

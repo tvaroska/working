@@ -59,42 +59,42 @@
 - One-handed navigation friendly
 
 **3. Summary Consumption**
-**Action:** Taps on priority newsletter article  
-**System:** Shows AI Summary with key points  
-**User State:** Focused reading while managing subway movement  
-**Expectation:** Quick understanding of core insights
+**Action:** Taps on priority newsletter article
+**System:** Shows AI Summary with clear, scannable format
+**User State:** Focused reading while managing subway movement
+**Expectation:** Quick understanding of core insights in text format
 
 **Summary Page Features:**
 - 2-3 sentence AI Summary at top
 - 3-5 bullet points of key takeaways
 - Sentiment indicator (positive/negative/neutral news)
-- Related articles/episodes suggestion
+- Related articles suggestion
 - "Read Full Article" option
-- Save functionality
+- Save functionality for later reading
 
 **Success Criteria:**
 - Understands article value within 60 seconds
 - Can articulate main points to colleagues later
 - Easy transition back to main feed
 
-**4. Podcast Episode Exploration**
-**Action:** Taps on new podcast episode from business podcast  
-**System:** Shows episode AI Summary and key segments  
-**User State:** Deciding whether to queue for later listening  
-**Expectation:** Understanding episode value without listening
+**4. Newsletter Content Organization**
+**Action:** Reviews additional newsletters and content items
+**System:** Shows organized content feed with clear prioritization
+**User State:** Processing multiple content sources efficiently
+**Expectation:** Quick triage of relevant vs non-relevant content
 
-**Episode Page Features:**
-- Host and guest information
-- Episode theme and main topics
-- Timestamp of key segments (with AI summaries)
-- Related episodes from same podcast
-- "Play Now" and "Add to Queue" options
-- Estimated listen time and complexity level
+**Content Organization Features:**
+- Source identification and credibility indicators
+- Content type and estimated reading time
+- Topic tags for quick categorization
+- Batch actions for similar content
+- Smart filtering by interest areas
+- Reading progress tracking
 
 **Success Criteria:**
-- Determines episode relevance within 45 seconds
-- Can easily add to listening queue for later
-- Understands which segments are most valuable
+- Processes content items quickly and accurately
+- Efficiently organizes content for later reading
+- Maintains awareness of important topics
 
 **5. Quick Actions & Organization**
 **Action:** Saves important items, dismisses others  
@@ -121,8 +121,8 @@
 **Expectation:** Reliable access regardless of network
 
 **Offline Features:**
-- Automatic download of saved content
-- Offline audio download for queued podcasts
+- Automatic download of saved articles and summaries
+- Offline content caching for essential reading
 - Clear indication of offline availability
 - Sync when connection restored
 
@@ -132,14 +132,14 @@
 - Efficient storage management
 
 #### Journey Completion
-**Outcome:** User arrives at work informed about overnight developments  
-**Time Spent:** 22 minutes of 25-minute commute  
-**Content Processed:** 12 newsletter items, 4 podcast episodes  
-**Actions Taken:** 
-- Saved 3 articles for deeper reading
-- Queued 2 podcast episodes for evening commute
+**Outcome:** User arrives at work informed about overnight developments
+**Time Spent:** 22 minutes of 25-minute commute
+**Content Processed:** 16 newsletter items across various sources
+**Actions Taken:**
+- Saved 5 articles for deeper reading
 - Dismissed 11 items as not relevant
-- Shared 1 article to team Slack
+- Shared 2 articles to team Slack
+- Organized content by topic for follow-up
 
 **Success Metrics:**
 - 85% of valuable content identified and processed
@@ -168,7 +168,7 @@ When breaking news or urgent industry development occurs:
 ### Path C: Minimal Engagement
 When user has very limited time or attention:
 1. Glances at top 3 priority items only
-2. Uses voice assistant for hands-free AI Summary playback
+2. Scans AI summaries for key insights while walking
 3. Defers all non-priority content to weekend batch processing
 4. Relies heavily on automated categorization and filtering
 

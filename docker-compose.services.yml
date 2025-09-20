@@ -1,0 +1,101 @@
+# All Services - Infrastructure + Application Services
+services:
+  # Infrastructure Services
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: updater_postgres
+    environment:
+      POSTGRES_DB: updater_app
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./services/postgres/schema.sql:/docker-entrypoint-initdb.d/00-schema.sql
+      - ./services/postgres/backups:/backups
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d updater_app"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+  redis:
+    image: redis:7-alpine
+    container_name: updater_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    volumes:
+      - redis_data:/data
+      - ./services/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+
+  # Application Services
+  auth:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    container_name: updater_auth
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://app_user:${POSTGRES_PASSWORD}@postgres:5432/updater_app
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-7a9c8e6f4d2b1a5c9e8f7d3b6a4c2e1f9d8c7b5a3e6f4d2a1c9e8f7d3b6a4c2e1f}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-3f7e9d2a8c6b4e1a7d3f9c5e2b8a6d4f1c7e9d2a8c6b4e1a7d3f9c5e2b8a6d4f1c}
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: updater_frontend
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      auth:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: updater_network
+    driver: bridge

@@ -1,4 +1,4 @@
-# User Personas - Newsletter & Podcast Aggregation App
+# User Personas - Updater
 
 ## Primary Personas
 
@@ -39,6 +39,7 @@
   - Relies heavily on offline download capabilities
   - Uses swipe gestures for quick triage (save/dismiss)
   - Prefers audio AI summaries during walking portions of commute
+  - Switches between text and audio based on environment (quiet vs noisy)
   - Downloads content overnight on WiFi for day's consumption
 - **Desktop (20% of usage):** Deep-dive reading at work
   - Uses web app during lunch breaks for detailed article reading
@@ -82,7 +83,8 @@
 
 **Usage Patterns:**
 - Heavy usage during travel (airports, flights, hotels)
-- Prefers audio AI summaries over reading
+- Prefers audio AI summaries over reading while traveling
+- Uses text summaries for quick scanning, audio for hands-free consumption
 - Needs quick scanning capability
 - Values content categorization and filtering
 - Wants sharing/forwarding capabilities
@@ -93,6 +95,7 @@
   - iPhone for quick updates during taxi/Uber rides
   - Heavy reliance on offline downloads due to inconsistent connectivity
   - Uses voice-to-text for sharing insights while walking through airports
+  - Listens to audio summaries during flights and taxi rides
   - Prefers landscape orientation for comfortable reading during flights
 - **Desktop (30% of usage):** Strategic planning and team sharing
   - Uses web app in office for comprehensive content review
@@ -155,6 +158,8 @@
   - iPhone for arXiv alerts and Twitter feed monitoring during commute
   - Quick paper saving for later desktop analysis
   - Podcast listening during gym sessions with skip-to-segments feature
+  - Uses audio summaries for paper reviews during commute
+  - Prefers text summaries for technical deep-dives requiring focus
   - Uses voice notes to capture research ideas triggered by AI summaries
   - Relies on notification badges to track unread priority papers
 
@@ -206,6 +211,7 @@
   - Heavy use of Read Later queue for weekend batch processing
   - Prefers progressive web app for cross-device sync without app store
   - Uses voice search for hands-free content discovery while coding
+  - Switches to audio summaries during coding sessions for background learning
 - **Desktop (45% of usage):** Structured learning and note-taking
   - Uses web app for comprehensive weekend learning sessions
   - Multiple browser tabs for connecting concepts across disciplines
@@ -252,6 +258,7 @@
   - iPhone for breaking news alerts and trend monitoring
   - Quick content saving during commute or travel
   - Uses voice notes to capture content ideas on-the-go
+  - Listens to audio summaries while commuting for inspiration
   - Social sharing directly from mobile for time-sensitive insights
   - Notification customization for competitive intelligence
 
@@ -280,6 +287,7 @@
   - Prefers simplified interface with minimal options
   - Uses Read Later queue to avoid pressure during busy weekdays
   - Relies on digest notifications rather than real-time alerts
+  - Occasionally uses audio summaries while doing household tasks
 - **Desktop (60% of usage):** Relaxed deep-dive sessions
   - Uses web app for unhurried weekend exploration
   - Prefers full articles over AI summaries when time allows
