@@ -53,6 +53,7 @@ On startup, the server prints:
 - `MOCK_BRIDGE_HOST` (default: `127.0.0.1`) — bind address
 - `MOCK_BRIDGE_PORT` (default: `8080`) — bind port
 - `MOCK_BRIDGE_HOLD_SECONDS` (default: `10.0`) — how long to hold in `WORKING` before `COMPLETED`
+- `MOCK_BRIDGE_PARK` (default: unset) — if `1`/`true`, the first turn **parks** at `INPUT_REQUIRED` (a pause awaiting input, not a failure) and only a resume turn completes it. This is the Sprint-1 pause/resume tracer consumed by the native `RemoteA2aAgent` ([adr-0009](../docs/decisions/adr-0009-native-a2a-consumer.md)).
 
 The default 10s hold exercises the poll path. For a quicker manual run, lower it: `MOCK_BRIDGE_HOLD_SECONDS=2`.
 
@@ -76,6 +77,12 @@ The agent prints the rendered document id (`gov-id-clean`) and its structured fi
 - `GOOGLE_API_KEY` — API key for Gemini (or configure Vertex AI in your environment)
 - `ADDRESS_AGENT_MODEL` (default: `gemini-2.0-flash`) — model id for the agent
 - `BRIDGE_BASE_URL` (default: `http://127.0.0.1:8080`) — the mock's address
+
+## Native A2A consumer (Sprint 1, adr-0009)
+
+From Sprint 1 the demos consume the Bridge through ADK's platform-native `RemoteA2aAgent` rather than the M0 `BridgeClient` poll loop (kept only as a tracer-bullet double). `bridge_client.build_bridge_remote_agent(agent_card_url)` returns a card-configured consumer — the mock→real / local→GCP swap is a **different Agent Card URL**, not different agent code. The native construct gives progress (`TaskStatusUpdateEvent.status.message`) and **park/resume** (`INPUT_REQUIRED` → `LongRunningFunctionTool` pause → `FunctionResponse` resume) for free.
+
+`tests/test_native_consumer.py` covers this end to end: the wire contract (raw client), the `RemoteA2aAgent` pause/resume spike, and the port's `BridgeParkedError` guard. `RemoteA2aAgent` is `@a2a_experimental` (ADK 2.7.0) — pinned via `use_legacy=True` until validated.
 
 ## Lint
 

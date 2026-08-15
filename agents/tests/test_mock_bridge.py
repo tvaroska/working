@@ -67,7 +67,7 @@ def test_executor_emits_working_then_completed():
     entry = load_gov_id_clean_entry()
     executor = MockBridgeExecutor(entry, hold_seconds=0.0)
     queue = FakeQueue()
-    context = SimpleNamespace(task_id="t1", context_id="ctx-1")
+    context = SimpleNamespace(task_id="t1", context_id="ctx-1", current_task=None)
 
     asyncio.run(executor.execute(context, queue))
 
@@ -107,7 +107,9 @@ def test_build_agent_card():
     card = build_agent_card("http://127.0.0.1:8080")
 
     assert card.name == "Mock Document Bridge"
-    assert card.capabilities.streaming is False
+    # streaming=True so the native RemoteA2aAgent consumer receives progress
+    # TaskStatusUpdateEvents (adr-0009).
+    assert card.capabilities.streaming is True
     assert card.capabilities.push_notifications is False
 
     # Find the JSONRPC interface

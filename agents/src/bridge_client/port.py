@@ -29,6 +29,18 @@ class BridgeTimeoutError(BridgeClientError):
     """Raised when a ``collect`` poll loop exceeds its deadline."""
 
 
+class BridgeParkedError(BridgeClientError):
+    """Raised when a collect parks at ``INPUT_REQUIRED`` / ``AUTH_REQUIRED``.
+
+    A park is a **pause awaiting input, not a failure** (adr-0009). The M0
+    tracer-bullet port has no resume path, so it surfaces the park as this
+    distinct error rather than treating it as a generic terminal failure (which
+    would misreport a resumable wait) or looping until the poll deadline (a
+    silent hang). Parked collections require the native ``RemoteA2aAgent``
+    consumer, which pauses/resumes via a ``LongRunningFunctionTool``.
+    """
+
+
 class BridgeClient(abc.ABC):
     """The abstract port the agent core talks through to reach the Bridge."""
 

@@ -36,15 +36,28 @@ from a2a.types import (
 
 from contract import CollectRequest, ExchangeTurn
 
-from .port import BridgeClient, BridgeClientError, BridgeTimeoutError
+from .port import (
+    BridgeClient,
+    BridgeClientError,
+    BridgeParkedError,
+    BridgeTimeoutError,
+)
 
-# Terminal states that are not a successful completion. For M0 there is no
-# multi-turn, so INPUT_REQUIRED / AUTH_REQUIRED are treated as failures too.
+# Terminal states that are not a successful completion.
 _TERMINAL_FAILURE_STATES: frozenset[TaskState] = frozenset(
     {
         TaskState.TASK_STATE_FAILED,
         TaskState.TASK_STATE_CANCELED,
         TaskState.TASK_STATE_REJECTED,
+    }
+)
+
+# Park states: a pause awaiting input, NOT a failure (adr-0009). The M0 port has
+# no resume path, so it raises BridgeParkedError instead of counting these as a
+# generic failure or looping until the poll deadline. Parked collections require
+# the native RemoteA2aAgent consumer.
+_PARK_STATES: frozenset[TaskState] = frozenset(
+    {
         TaskState.TASK_STATE_INPUT_REQUIRED,
         TaskState.TASK_STATE_AUTH_REQUIRED,
     }
@@ -142,6 +155,11 @@ class A2ABridgeClient(BridgeClient):
             state = task.status.state
             if state == TaskState.TASK_STATE_COMPLETED:
                 break
+            if state in _PARK_STATES:
+                raise BridgeParkedError(
+                    f"collect parked at {state}; the M0 BridgeClient port cannot "
+                    "resume — use the native RemoteA2aAgent consumer (adr-0009)"
+                )
             if state in _TERMINAL_FAILURE_STATES:
                 raise BridgeClientError(f"task reached terminal non-completed state: {state}")
             if loop.time() >= deadline:

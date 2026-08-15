@@ -45,7 +45,10 @@ def build_agent_card(base_url: str) -> AgentCard:
             )
         ],
         capabilities=AgentCapabilities(
-            streaming=False,
+            # streaming=True so the native RemoteA2aAgent consumer can receive
+            # progress TaskStatusUpdateEvents (adr-0009). The M0 BridgeClient port
+            # is unaffected — it forces ClientConfig(streaming=False, polling=True).
+            streaming=True,
             push_notifications=False,
         ),
         default_input_modes=["application/json"],
@@ -67,6 +70,7 @@ def create_app(
     base_url: str = "http://127.0.0.1:8080",
     *,
     hold_seconds: float = 10.0,
+    park: bool = False,
     evals_path: Path | None = None,
 ) -> Starlette:
     """Create the mock Bridge Starlette application.
@@ -74,6 +78,8 @@ def create_app(
     Args:
         base_url: The externally reachable base URL (baked into the Agent Card).
         hold_seconds: How long the executor holds in WORKING state before completing.
+        park: If True, the first turn parks at INPUT_REQUIRED and a resume turn
+            completes it (the adr-0009 pause/resume tracer).
         evals_path: Optional explicit path to expected.json (for testing).
 
     Returns:
@@ -86,7 +92,7 @@ def create_app(
     """
     entry = load_gov_id_clean_entry(evals_path)
     card = build_agent_card(base_url)
-    executor = MockBridgeExecutor(entry, hold_seconds=hold_seconds)
+    executor = MockBridgeExecutor(entry, hold_seconds=hold_seconds, park=park)
     handler = DefaultRequestHandler(
         agent_executor=executor,
         task_store=InMemoryTaskStore(),

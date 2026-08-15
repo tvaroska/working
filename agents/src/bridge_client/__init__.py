@@ -7,13 +7,21 @@ never import anything under ``agents.*`` (the client seam is agent-agnostic).
 """
 
 from .a2a_client import A2ABridgeClient, request_to_message, task_to_exchange_turn
-from .port import BridgeClient, BridgeClientError, BridgeTimeoutError
+from .port import (
+    BridgeClient,
+    BridgeClientError,
+    BridgeParkedError,
+    BridgeTimeoutError,
+)
+from .remote_consumer import build_bridge_remote_agent
 
 __all__ = [
     "BridgeClient",
     "BridgeClientError",
+    "BridgeParkedError",
     "BridgeTimeoutError",
     "A2ABridgeClient",
+    "build_bridge_remote_agent",
     "request_to_message",
     "task_to_exchange_turn",
 ]
