@@ -10,9 +10,14 @@ the Sprint-1 pause/resume tracer (adr-0009). A resume message (same task_id, so
 transitions carry a **non-empty** ``status.message`` so a native ``RemoteA2aAgent``
 consumer can surface progress and turn the park into a LongRunningFunctionTool
 pause.
+
+S1-5 makes the executor **stateful per context**: each Collect round is a new A2A
+task under the same ``context_id``, and the executor keeps a per-context round
+counter to step through a multi-turn scenario script.
 """
 
 import asyncio
+from pathlib import Path
 
 from a2a.helpers.proto_helpers import get_data_parts, new_data_part, new_text_message
 from a2a.server.agent_execution import AgentExecutor
@@ -21,7 +26,8 @@ from a2a.types import Task, TaskState, TaskStatus
 
 from contract import LedgerEntry
 
-from .fixtures import build_exchange_turn
+from .fixtures import build_exchange_turn, load_entry
+from .scenarios import MockScenario
 
 
 class MockBridgeExecutor(AgentExecutor):
@@ -34,26 +40,46 @@ class MockBridgeExecutor(AgentExecutor):
 
     With ``park=True`` the first turn ends at INPUT_REQUIRED (a pause awaiting
     input) and only a resume turn completes it — the adr-0009 park/resume tracer.
+
+    S1-5: the executor is now **stateful per context** and drives a multi-turn
+    scenario script. Each round under the same context_id advances the scenario
+    step counter.
     """
 
     def __init__(
         self,
-        ledger_entry: LedgerEntry,
+        scenario: MockScenario,
         *,
+        evals_path: Path | None = None,
         hold_seconds: float = 10.0,
         park: bool = False,
     ) -> None:
         """Initialize the mock executor.
 
         Args:
-            ledger_entry: The preloaded ledger entry to return (gov-id-clean).
+            scenario: The multi-turn scenario to script.
+            evals_path: Explicit path to expected.json (for testing).
             hold_seconds: How long to hold in WORKING state before completing.
             park: If True, the first turn parks at INPUT_REQUIRED and a resume
                 turn completes it (the Sprint-1 pause/resume tracer).
         """
-        self._ledger_entry = ledger_entry
+        self._scenario = scenario
         self._hold_seconds = hold_seconds
         self._park = park
+
+        # Eagerly load every distinct ledger entry across scenario steps (fail fast).
+        entry_ids = {
+            entry_id
+            for step in scenario.steps
+            for entry_id in step.ledger_ids
+        }
+        self._entries: dict[str, LedgerEntry] = {
+            entry_id: load_entry(entry_id, evals_path) for entry_id in entry_ids
+        }
+
+        # Per-context round counter (key: context_id, value: round index).
+        self._rounds: dict[str, int] = {}
+
         self.last_request_data: dict | None = None
         """Data part of the most recent first-turn inbound message.
 
@@ -71,7 +97,7 @@ class MockBridgeExecutor(AgentExecutor):
     async def execute(self, context, event_queue):
         """Execute the mock collect.
 
-        Default: Task -> WORKING -> hold -> artifact -> COMPLETED.
+        Default: Task -> WORKING -> hold -> faked chase progress -> artifact -> COMPLETED.
         Park mode, first turn: Task -> WORKING -> hold -> INPUT_REQUIRED (park).
         Park mode, resume turn: WORKING -> artifact -> COMPLETED.
 
@@ -81,14 +107,16 @@ class MockBridgeExecutor(AgentExecutor):
             event_queue: Event queue for emitting status updates.
         """
         # A resume message carries the existing task_id, so the request handler
-        # populates context.current_task. A parked task being resumed completes.
+        # populates context.current_task. A parked task being resumed completes
+        # with the scenario's final step.
         current = context.current_task
         if (
             self._park
             and current is not None
             and current.status.state == TaskState.TASK_STATE_INPUT_REQUIRED
         ):
-            await self._complete(context, event_queue, resume=True)
+            final_step = self._scenario.steps[-1]
+            await self._complete(context, event_queue, step=final_step, resume=True)
             return
 
         # Capture the first-turn inbound request's data part so the seam suite
@@ -102,6 +130,12 @@ class MockBridgeExecutor(AgentExecutor):
         # context threads across the Collect loop's rounds.
         if context.context_id:
             self.context_ids_seen.append(context.context_id)
+
+        # Compute the round: per-context round counter (S1-5).
+        ctx = context.context_id
+        r = self._rounds.get(ctx, 0)
+        self._rounds[ctx] = r + 1
+        step = self._scenario.step_for_round(r)
 
         # First turn. Enqueue a Task object (required by a2a-sdk for async
         # workflows) BEFORE any TaskStatusUpdateEvents.
@@ -122,6 +156,13 @@ class MockBridgeExecutor(AgentExecutor):
         )
         await asyncio.sleep(self._hold_seconds)
 
+        # Faked chase/timeout: emit non-empty WORKING status updates (S1-5).
+        for msg in step.chase_messages:
+            await updater.update_status(
+                TaskState.TASK_STATE_WORKING,
+                message=new_text_message(msg),
+            )
+
         if self._park:
             # Park: a pause awaiting input, not a failure (adr-0009). Carry a
             # non-empty status.message so the consumer can render the park reason.
@@ -131,16 +172,30 @@ class MockBridgeExecutor(AgentExecutor):
             )
             return
 
-        await self._complete(context, event_queue, resume=False)
+        await self._complete(context, event_queue, step=step, resume=False)
 
-    async def _complete(self, context, event_queue, *, resume: bool) -> None:
-        """Attach the ExchangeTurn artifact and mark the task COMPLETED."""
+    async def _complete(self, context, event_queue, *, step, resume: bool) -> None:
+        """Attach the ExchangeTurn artifact and mark the task COMPLETED.
+
+        Args:
+            context: Request context carrying task_id and context_id.
+            event_queue: Event queue for emitting status updates.
+            step: The scenario step to complete with.
+            resume: Whether this is a resume turn (INPUT_REQUIRED -> COMPLETED).
+        """
         updater = TaskUpdater(event_queue, context.task_id, context.context_id)
         if resume:
             await updater.start_work(
                 message=new_text_message("Resuming with provided input…")
             )
-        turn = build_exchange_turn(context.context_id, self._ledger_entry)
+        # Build ledger from the step's entry ids.
+        ledger = [self._entries[i] for i in step.ledger_ids]
+        turn = build_exchange_turn(
+            context.context_id,
+            ledger,
+            terminal=step.terminal,
+            outstanding=list(step.outstanding),
+        )
         artifact_part = new_data_part(turn.model_dump(mode="json"))
         await updater.add_artifact([artifact_part])
         await updater.complete()

@@ -16,7 +16,7 @@ from a2a.utils.constants import TransportProtocol
 from starlette.applications import Starlette
 
 from .executor import MockBridgeExecutor
-from .fixtures import load_gov_id_clean_entry
+from .scenarios import GOV_ID_INSTANT, SCENARIOS, MockScenario
 
 
 def build_agent_card(base_url: str) -> AgentCard:
@@ -68,6 +68,7 @@ def build_agent_card(base_url: str) -> AgentCard:
 def create_app(
     base_url: str = "http://127.0.0.1:8080",
     *,
+    scenario: MockScenario | str | None = None,
     hold_seconds: float = 10.0,
     park: bool = False,
     evals_path: Path | None = None,
@@ -76,6 +77,8 @@ def create_app(
 
     Args:
         base_url: The externally reachable base URL (baked into the Agent Card).
+        scenario: The multi-turn scenario to script. None -> GOV_ID_INSTANT;
+            str -> SCENARIOS[str]; MockScenario -> as-is.
         hold_seconds: How long the executor holds in WORKING state before completing.
         park: If True, the first turn parks at INPUT_REQUIRED and a resume turn
             completes it (the adr-0009 pause/resume tracer).
@@ -89,9 +92,21 @@ def create_app(
         The handler's aclose() is wired into Starlette's lifespan so the
         background execute() task drains cleanly on server stop.
     """
-    entry = load_gov_id_clean_entry(evals_path)
+    # Resolve scenario
+    if scenario is None:
+        scenario = GOV_ID_INSTANT
+    elif isinstance(scenario, str):
+        if scenario not in SCENARIOS:
+            raise ValueError(f"Unknown scenario: {scenario}")
+        scenario = SCENARIOS[scenario]
+
     card = build_agent_card(base_url)
-    executor = MockBridgeExecutor(entry, hold_seconds=hold_seconds, park=park)
+    executor = MockBridgeExecutor(
+        scenario,
+        evals_path=evals_path,
+        hold_seconds=hold_seconds,
+        park=park,
+    )
     handler = DefaultRequestHandler(
         agent_executor=executor,
         task_store=InMemoryTaskStore(),

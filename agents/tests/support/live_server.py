@@ -28,14 +28,21 @@ def free_port() -> int:
 class LiveMockServer:
     """Context manager running the mock Bridge in a daemon thread.
 
-    Picks a free port, creates the app with ``hold_seconds`` / ``park``, runs a
-    uvicorn server in a daemon thread, and waits until it is ready. On exit,
+    Picks a free port, creates the app with ``hold_seconds`` / ``park`` / ``scenario``,
+    runs a uvicorn server in a daemon thread, and waits until it is ready. On exit,
     signals shutdown and joins the thread.
     """
 
-    def __init__(self, *, hold_seconds: float = 1.0, park: bool = False):
+    def __init__(
+        self,
+        *,
+        hold_seconds: float = 1.0,
+        park: bool = False,
+        scenario=None,
+    ):
         self.hold_seconds = hold_seconds
         self.park = park
+        self.scenario = scenario
         self.port = free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
         self.card_url = f"{self.base_url}/.well-known/agent-card.json"
@@ -44,7 +51,12 @@ class LiveMockServer:
         self.executor = None
 
     def __enter__(self) -> "LiveMockServer":
-        app = create_app(self.base_url, hold_seconds=self.hold_seconds, park=self.park)
+        app = create_app(
+            self.base_url,
+            scenario=self.scenario,
+            hold_seconds=self.hold_seconds,
+            park=self.park,
+        )
         self.executor = app.state.mock_executor
         config = uvicorn.Config(
             app,
