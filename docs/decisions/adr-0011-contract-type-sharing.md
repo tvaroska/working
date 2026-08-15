@@ -1,7 +1,8 @@
 # ADR-0011 — Contract-type sharing strategy (shared package)
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-15
+- **Ratified:** 2026-08-15 (S0.8 sign-off gate)
 - **Scope:** How contract types (`CollectRequest`, `ExchangeTurn`, `CollectionStatus`, `LedgerEntry`, etc.) are shared between the `agents/` and `bridge/` projects while preserving the invariant that `bridge/` never imports `agents/`.
 - **Ratified at:** S0.8 (sign-off gate; physical move deferred until after sign-off)
 - **Context:** `CLAUDE.md` (invariant: `bridge/` never imports `agents/`; "Core vs. demos" — `bridge/` is a reusable showcase artifact, agents are consumers); `PLAN.md` S0.2, S0.8; `wiki/bridge-aggregate-model.md`; `docs/decisions/adr-0001-stack.md`
@@ -40,7 +41,7 @@ Adopt a **shared third package `contract`** that both `agents/` and `bridge/` de
 
 ### Timing
 
-This ADR records the **recommended target** with **Status: Proposed**. The physical restructure (creating `contract/`, moving the code, updating `pyproject.toml`s, re-locking) happens in a **follow-up task after S0.8 sign-off**, not in S0.2. S0.2 only scaffolds `bridge/` as a separate project and authors this ADR; the contract extraction is gated on design-owner approval.
+This ADR was authored with **Status: Proposed** during S0.2 (bridge scaffold) and **ratified at S0.8**. The physical restructure (creating `contract/`, moving the code, updating `pyproject.toml`s, re-locking) remains a **follow-up task now that S0.8 has ratified this ADR**. The contract extraction is a separate post-sign-off task; S0.8 only ratifies the decision.
 
 ## Rationale
 
@@ -84,9 +85,9 @@ Create `a2a-document-bridge-contract` as a separately-versioned, published packa
 
 ## Sign-off gate
 
-This ADR is authored with **Status: Proposed** during S0.2 (bridge scaffold). The physical move of `contract/` out of `agents/src/` is gated on **S0.8 sign-off** (stack + open-decision validation gate) and happens in a follow-up task after approval.
+This ADR was authored with **Status: Proposed** during S0.2 (bridge scaffold), ratified at **S0.8** (stack + open-decision validation gate). The physical move of `contract/` out of `agents/src/` remains a follow-up task.
 
-Mechanics for the follow-up (post-S0.8):
+Mechanics for the follow-up (post-S0.8 ratification):
 1. Create `contract/pyproject.toml` (minimal: pydantic-only, no heavy deps).
 2. Move `agents/src/contract/` to `contract/src/contract/` (code unchanged).
 3. Update `agents/pyproject.toml` and `bridge/pyproject.toml`: add `a2a-document-bridge-contract` to dependencies, add `[tool.uv.sources]` path dependency, drop `src/contract` from `agents/`'s wheel-packages list.

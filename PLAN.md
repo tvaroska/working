@@ -70,10 +70,17 @@
   3. `.env.example` conventions consolidated (Vertex vars for `agents/`, `BRIDGE_CARD_URL`/`BRIDGE_BASE_URL`); confirm `.env` gitignored, `.env.example` tracked.
   _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.7-dev-env-contributor-workflow.md)_
 
-- [ ] **S0.8 — Stack + open-decision sign-off (gate, not code).** Resolve and record the decisions Sprint 1 builds on, so they're designed in, not retrofitted.
+- [x] **S0.8 — Stack + open-decision sign-off (gate, not code).** Resolve and record the decisions Sprint 1 builds on, so they're designed in, not retrofitted.
   1. Walk `wiki/bridge-open-questions.md`; convert each resolved item to an ADR or a PLAN note, leave the rest explicitly deferred with an owner.
   2. Confirm the **contract-sharing** choice (S0.2), the **seam list** (S0.3), and the **experimental-surface register**: `RemoteA2aAgent` (`@a2a_experimental`), `ResumabilityConfig` (`@experimental`), and the **`Workflow` spike gates** for S1-6 (`RemoteA2aAgent`-as-node + in-`Workflow` pause/resume; `LoopAgent` deprecated fallback) — see `docs/decisions/adr-0010-durable-consumer-construct.md` and `wiki/bridge-a2a-consumer.md`.
   3. Re-affirm the ADR-0001 pins resolve on a clean machine (`uv lock` reproducibility).
+  **Sign-off (2026-08-15):**
+  - **Open-questions walk:** every resolved decision maps to an ADR (0002 thresholds, 0003 exchange-view, 0004 signal-provider, 0005 extraction-binding, 0008 long-running-lifecycle, 0009 native-consumer, 0010 durable-construct, 0011 contract-sharing **Accepted**). Aspirational items (Benefits/RFP arcs, four-signal provider, party memory, cold-inbound, outbound client, multi-tenancy, managed-task-store, DocAI adapter, hardening) **deferred by phase, owner = design owner** per roadmap.
+  - **Contract-sharing:** confirmed — shared third `contract` package (ADR-0011 **Accepted**, Status Proposed→Accepted); physical move is a post-sign-off follow-up task.
+  - **Seam list:** confirmed — six seams (`sessions`, `task_store`, `exchange_store`, `skill_registry`, `scheduler`, `extraction`); single-sourced by `Seam` enum + `@pytest.mark.seam`.
+  - **Experimental-surface register:** confirmed — `docs/decisions/adr-0012-experimental-surface-register.md` (**Accepted**); `RemoteA2aAgent` (`@a2a_experimental`, `use_legacy=True`), `ResumabilityConfig` (`@experimental`), two `Workflow` spike gates pending (S1-6: non-`LlmAgent` node + pause propagation), `LoopAgent` deprecated fallback.
+  - **Reproducibility:** `uv lock --check` green in `agents/` + `bridge/` (Resolved 74 packages each); CI drift-guard is `uv sync --locked`.
+  _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.8-stack-open-decision-signoff.md)_
 
 - [x] **S0.9 — Architecture-doc consolidation** (done 2026-08-15). Reset the two churned consumer docs to a target-first statement so Sprint 1 builds against a clean architecture, and harvest the session's source-verified findings into the invariant record. Not a full-repo reset — the rest of `wiki/` was audited consistent.
   1. **Harvested lessons** into `docs/lessons-learned.md`: **A12** (durable consumer = `Workflow` graph; `AgentTool`'s fresh throwaway session is the root cause; the two distinct "returns"; `LoopAgent` deprecated; `Workflow`-can't-be-`LlmAgent`-subagent; the general service-agent shape; `AgentTool → Workflow` migration + spike gates) and **A13** (state restore is mostly DEFAULT; "the webhook is a doorbell, not a restore").

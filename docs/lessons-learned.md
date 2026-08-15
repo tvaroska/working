@@ -268,6 +268,9 @@ seam-parity story (local vs GCP adapters) holds.
   the config was coherent — it was never `apply`d. The build's infra needs its own such check.
 
 ### C5. ADK / A2A version targets to pin from day one
+
+> **Canonical register:** The agreed, tabular register of experimental surfaces, pins, spike gates, and tracking discipline is `docs/decisions/adr-0012-experimental-surface-register.md` (ratified S0.8). C5 is the narrative rationale; ADR-0012 is the binding record.
+
 - **`google-adk >= 2.7.0, < 3`.** `ResumabilityConfig` is `[EXPERIMENTAL]` in 2.7.0 and is what
   long-running HITL pause/resume relies on. Two crux APIs to verify with a spike before leaning on
   them: (1) HITL pause/resume via a long-running function call + an id/name-matched `FunctionResponse`
