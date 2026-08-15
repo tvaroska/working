@@ -4,14 +4,22 @@ The address agent is a real ``google-adk`` ``LlmAgent`` (day-one platform bet �
 ADR-0001) that consumes the Document Bridge through ADK's platform-native
 ``RemoteA2aAgent`` (adr-0009), wired as an **``AgentTool``** (call-and-return) so
 control **returns** to the address agent with the collected ``ExchangeTurn`` (S1-2).
-On a turn the model calls the ``document_bridge`` tool; the Bridge collects the
-``address-proof`` document for the party and the structured ``ExchangeTurn`` comes
-back as the tool result for the agent to post-process (the ``is_satisfied`` gate in
-S1-3, the Collect loop in S1-4).
+
+S1-4 grows the one-shot call into the **Collect loop where the app decides "done"**:
+the model routes — call ``document_bridge`` to collect, then call the authoritative
+``check_completeness`` gate — and the deterministic gate (S1-3) decides done. If the
+gate says not done, the model chases the outstanding proof by calling
+``document_bridge`` again; the loop terminates when the gate returns ``done=True``.
+"LLM routes, code decides": the model may call the gate to route but can never mint
+"complete" itself (docs/lessons-learned.md A3).
 
 The structured ``CollectRequest`` (``{party, skill}``) is injected on the send path
-by a request interceptor baked into the consumer (S1-2), independent of the model's
-conversation content.
+by a request interceptor baked into the consumer (S1-2). One **durable A2A exchange
+context** spans the whole loop: ``BridgeAgentTool`` writes the returned turn's
+``context_id`` to session state and the interceptor stamps it on the next round's
+send, so every round continues the *same* exchange (no fresh context per round).
+The A2A ``task_id`` is deliberately not reused in the ``park=False`` completing path
+(adr-0009 §S1-4 note).
 
 The party and skill are hard-coded (no skills registry in M0). The Bridge is
 configured only by its **Agent Card URL** — the single mock->real / local->GCP
@@ -28,15 +36,26 @@ from google.genai import types
 from bridge_client import BridgeAgentTool, build_bridge_remote_agent
 from contract import CollectRequest
 
+from .satisfaction import COLLECTION_STATUS_STATE_KEY, check_completeness
+
 PARTY = "jordan-lee"
 SKILL = "address-proof"
 DEFAULT_MODEL = os.environ.get("ADDRESS_AGENT_MODEL", "gemini-3.7-flash")
 BRIDGE_TOOL_NAME = "document_bridge"
+GATE_TOOL_NAME = "check_completeness"
 
 INSTRUCTION = (
-    "You are an address-verification agent. To collect the address-proof document "
-    f"for party {PARTY}, call the `{BRIDGE_TOOL_NAME}` tool. When it returns the "
-    "collected `ExchangeTurn`, present the document id and its structured fields."
+    "You are an address-verification agent collecting the address-proof document "
+    f"for party {PARTY}. Follow this loop exactly:\n"
+    f"1. Call the `{BRIDGE_TOOL_NAME}` tool to collect the address proof.\n"
+    f"2. Call the `{GATE_TOOL_NAME}` tool — the authoritative gate that decides "
+    "whether the requirement is satisfied. You may never decide 'complete' "
+    "yourself.\n"
+    f"3. If its `done` is false, call `{BRIDGE_TOOL_NAME}` again to chase the "
+    "outstanding proof (`outstanding` says what is still needed), then repeat "
+    "step 2.\n"
+    "4. When `done` is true, present the collected document id(s) and their "
+    "structured fields."
 )
 
 APP_NAME = "address"
@@ -70,9 +89,11 @@ def build_address_agent(
             ``BaseLlm`` instance (tests inject a scripted stub for a hermetic run).
 
     Returns:
-        A real ``google-adk`` ``LlmAgent`` whose sole tool is a
-        ``BridgeAgentTool`` wrapping a ``RemoteA2aAgent`` (``document_bridge``)
-        consuming the Bridge over A2A (call-and-return).
+        A real ``google-adk`` ``LlmAgent`` with two tools: a ``BridgeAgentTool``
+        wrapping a ``RemoteA2aAgent`` (``document_bridge``) consuming the Bridge
+        over A2A (call-and-return), and the authoritative ``check_completeness``
+        gate (S1-3) auto-wrapped as a ``FunctionTool``. The model routes between
+        them (the S1-4 Collect loop); the gate decides "done".
     """
     card_url = bridge_card_url or _default_card_url()
     bridge = build_bridge_remote_agent(
@@ -86,7 +107,26 @@ def build_address_agent(
         description="Address verification agent (M0 tracer bullet).",
         model=model,
         instruction=INSTRUCTION,
-        tools=[BridgeAgentTool(bridge)],
+        # Two tools: the Bridge collect (writes the turn to state under
+        # COLLECTION_STATUS_STATE_KEY) + the authoritative completeness gate that
+        # reads it. check_completeness is a plain function -> ADK auto-wraps it as
+        # a FunctionTool; its tool_context is ADK-injected so the model can never
+        # pass the ledger (the "code decides" guarantee).
+        #
+        # skip_summarization=False is required for the loop (S1-4): an ADK
+        # function-response event with skip_summarization set reports
+        # is_final_response()==True, so the Runner would break the turn right
+        # after the Bridge call and the model would never reach the gate. Keeping
+        # summarization on re-invokes the model after each collect so it can route
+        # to check_completeness and (if not done) chase again.
+        tools=[
+            BridgeAgentTool(
+                bridge,
+                skip_summarization=False,
+                result_state_key=COLLECTION_STATUS_STATE_KEY,
+            ),
+            check_completeness,
+        ],
         output_key="address_result",
     )
 

@@ -18,11 +18,24 @@ Coupling note (adr-0001 SDK-risk): this copies ``AgentTool.run_async``'s
 Runner-setup boilerplate, which is coupled to ADK internals; the seam suite is what
 catches drift on an SDK bump.
 
-S1-4/S1-5 concern (not solved here): ``AgentTool`` runs the wrapped agent in a
-fresh ``InMemorySessionService`` + new session per call, so native
-``LongRunningFunctionTool`` park/resume that relies on the peer ``task_id`` /
-``context_id`` persisting on the caller session does not survive across tool
-invocations. Irrelevant in S1-2 (single call-and-return, ``park=False``).
+S1-4 (multi-turn Collect loop) durable-context note: ``AgentTool`` runs the wrapped
+agent in a fresh ``InMemorySessionService`` + new session per call, so the native
+``RemoteA2aAgent``'s own event history (where it persists the peer ``context_id`` /
+``task_id``) is wiped between rounds. Parent->child **session state** seeding is the
+only channel that survives across ``AgentTool`` invocations. S1-4 therefore threads
+the exchange **context** across rounds via state: after a round the tool writes the
+returned turn's ``context_id`` under :data:`EXCHANGE_CONTEXT_STATE_KEY` (and, when a
+``result_state_key`` is configured, the whole turn dict for the completeness gate to
+read). The send-path interceptor (``remote_consumer``) then stamps that context id on
+the next round's ``message/send`` so every round continues the **same exchange** — no
+fresh context per round.
+
+Deliberately out of scope here (recorded in adr-0009): the A2A ``task_id`` is **not**
+reused across rounds in the ``park=False`` completing path — each round opens a new task
+under the same context (re-sending to a *completed* task is not valid A2A). Native
+``LongRunningFunctionTool`` park/resume **durability across AgentTool calls** (parked,
+weeks-scale timescale) remains a separate, later concern (S1-5 / Phase 3), unsolved by
+the state-threading above.
 """
 
 from typing import Any
@@ -34,6 +47,13 @@ from typing_extensions import override
 from contract import ExchangeTurn
 
 from .wire import extract_exchange_turn
+
+EXCHANGE_CONTEXT_STATE_KEY = "bridge_exchange_context_id"
+"""Session-state key under which the durable A2A exchange ``context_id`` is threaded.
+
+Bridge-owned (``bridge_client`` imports nothing from ``agents.*``). The tool writes it
+after a round; the send-path interceptor reads it to keep the loop on one exchange.
+"""
 
 # Content value is irrelevant — the send-path interceptor overwrites the outbound
 # parts with the CollectRequest DataPart — but it must be non-empty text, or
@@ -51,10 +71,26 @@ class BridgeAgentTool(AgentTool):
     present.
     """
 
-    def __init__(self, agent, *, skip_summarization: bool = True, **kwargs):
+    def __init__(
+        self,
+        agent,
+        *,
+        skip_summarization: bool = True,
+        result_state_key: str | None = None,
+        **kwargs,
+    ):
         # The structured dict is the answer; skip LLM re-narration of the ledger
-        # by default (the caller post-processes the dict, not prose).
+        # by default (the caller post-processes the dict, not prose). NOTE: in a
+        # multi-turn loop (S1-4) the caller must pass skip_summarization=False —
+        # an ADK function-response event with skip_summarization set reports
+        # is_final_response()==True, so the Runner ends the turn right after this
+        # tool and the model never routes to the next tool (e.g. the gate).
         super().__init__(agent, skip_summarization=skip_summarization, **kwargs)
+        # When set (e.g. the Address gate's COLLECTION_STATUS_STATE_KEY), the
+        # returned ExchangeTurn dict is written to parent session state under this
+        # key so the deterministic completeness gate can read it (S1-4). Optional,
+        # so existing S1-2 callers/tests are unchanged.
+        self.result_state_key = result_state_key
 
     @override
     async def run_async(
@@ -146,7 +182,19 @@ class BridgeAgentTool(AgentTool):
         turn = extract_exchange_turn(events)
         if turn is not None:
             # Validate + re-serialize for a guaranteed-clean, JSON-safe shape.
-            return ExchangeTurn.model_validate(turn).model_dump(mode="json")
+            turn_dict = ExchangeTurn.model_validate(turn).model_dump(mode="json")
+            # Thread the returned turn + exchange context into parent session
+            # state (S1-4). These deltas flush to the parent session via the
+            # tool's function_response event and are re-seeded into the next
+            # round's child session — the only cross-AgentTool channel: it lets
+            # the completeness gate read the ledger and keeps every round on the
+            # same A2A exchange context.
+            if self.result_state_key:
+                tool_context.state[self.result_state_key] = turn_dict
+            context_id = turn_dict.get("context_id")
+            if context_id:
+                tool_context.state[EXCHANGE_CONTEXT_STATE_KEY] = context_id
+            return turn_dict
 
         # Fallback: mirror AgentTool's text/error behavior.
         if last_content is None or last_content.parts is None:

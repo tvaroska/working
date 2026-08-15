@@ -41,7 +41,9 @@ The M0 tracer bullet uses **transfer** (`sub_agents`): thinnest one-shot delegat
 
 A second consequence of transfer: it forwards **conversation content**, not a structured `CollectRequest` DataPart — so the typed outbound request leaves the send path under M0's transfer wiring. Restoring it (carrying `CollectRequest` as a JSON part) rides along with the `AgentTool` switch.
 
-**Landed (2026-08-15, S1-2):** the address agent now wires the Bridge as a `BridgeAgentTool` (an `AgentTool` over the same `RemoteA2aAgent`), so control returns with the `ExchangeTurn` as the tool result. The `CollectRequest` DataPart is restored on the send path by a `RequestInterceptor` (guarded on `task_id` so it rewrites only the fresh send). The multi-turn Collect loop with one durable task/context across rounds remains (S1-4).
+**Landed (2026-08-15, S1-2):** the address agent now wires the Bridge as a `BridgeAgentTool` (an `AgentTool` over the same `RemoteA2aAgent`), so control returns with the `ExchangeTurn` as the tool result. The `CollectRequest` DataPart is restored on the send path by a `RequestInterceptor` (guarded on `task_id` so it rewrites only the fresh send).
+
+**Landed (2026-08-15, S1-4):** the multi-turn Collect loop is wired agent-side (`document_bridge` collect → authoritative `check_completeness` gate → chase if not done → terminate on satisfied). The durable unit across rounds is the exchange **`context_id`**, not a reused **`task_id`**: each `AgentTool` call runs in a fresh child session, so the `context_id` is threaded through **session state** (`BridgeAgentTool` writes it; the interceptor stamps it on the next send) — every round continues one exchange. In the `park=False` completing path each round legitimately opens a **new task under the same context** (a context groups tasks; re-sending to a *completed* task is invalid A2A); "one task reused across turns" applies to the parked `input-required` pause/resume timescale, whose cross-`AgentTool` durability is a later concern. See `adr-0009` (S1-4 amendment).
 
 ## Two mechanisms for long-running work
 
@@ -80,7 +82,8 @@ The [[bridge-collect|Collect]] tracer bullet (M0) originally consumed the Bridge
 - **Committed / already in the edge:** `_status_for` maps a pending collection → `INPUT_REQUIRED` ([[bridge-a2a-edge]]); native HITL pause/resume ([[bridge-adk]]).
 - **Landed (2026-08-15):** the address agent consumes the Bridge as a native `RemoteA2aAgent` (S1-2: wired as a **`BridgeAgentTool`** call-and-return; initially a transfer sub-agent); the M0 `BridgeClient` port was removed (adr-0009 amendment). Mock park (`INPUT_REQUIRED`) + non-empty `status.message` progress are covered by the seam suite.
 - **Landed (2026-08-15, S1-2):** the wiring switched from transfer to a **`BridgeAgentTool`** (`AgentTool` over `RemoteA2aAgent`) so control returns with the `ExchangeTurn`; the structured `CollectRequest` is restored on the send path via a `task_id`-guarded `RequestInterceptor`. Covered by the seam suite.
-- **Sprint 1 (remaining):** wire the **`is_satisfied`** gate (S1-3) and grow the multi-turn Collect loop with one durable task/context across rounds (S1-4). See `PLAN.md`.
+- **Landed (2026-08-15, S1-3/S1-4):** the **`is_satisfied`** gate (S1-3) is wired as the authoritative `check_completeness` tool, and the multi-turn Collect loop (S1-4) threads one durable exchange **`context_id`** across rounds via session state (task-vs-context distinction above). See `PLAN.md`.
+- **Sprint 1 (remaining):** grow the mock into the multi-turn contract double — document arrivals across turns, faked chase/timeout, distinct-issuer bill fixtures (S1-5). See `PLAN.md`.
 - **Risk:** `RemoteA2aAgent` is `@a2a_experimental` in `google-adk` 2.7.0 — pin and cover in the shared seam suite (`docs/decisions/adr-0001-stack.md`).
 
 ## Related

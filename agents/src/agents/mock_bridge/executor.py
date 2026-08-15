@@ -60,6 +60,13 @@ class MockBridgeExecutor(AgentExecutor):
         Lets the seam suite assert the outbound ``CollectRequest`` arrived as a
         structured JSON DataPart (S1-2), not free conversation text.
         """
+        self.context_ids_seen: list[str] = []
+        """Context id of each first-turn inbound message, in arrival order.
+
+        Lets the S1-4 live seam test assert the **same** exchange ``context_id``
+        arrives on every round (one durable exchange spans the Collect loop; no
+        fresh context per round).
+        """
 
     async def execute(self, context, event_queue):
         """Execute the mock collect.
@@ -91,6 +98,10 @@ class MockBridgeExecutor(AgentExecutor):
             datas = get_data_parts(message.parts)
             if datas:
                 self.last_request_data = datas[0]
+        # Record the exchange context id so the S1-4 seam test can assert the same
+        # context threads across the Collect loop's rounds.
+        if context.context_id:
+            self.context_ids_seen.append(context.context_id)
 
         # First turn. Enqueue a Task object (required by a2a-sdk for async
         # workflows) BEFORE any TaskStatusUpdateEvents.
