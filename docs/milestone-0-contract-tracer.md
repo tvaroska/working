@@ -71,4 +71,4 @@ Internal review of the **contract shape** with the design owner: are `CollectReq
 
 ## Feeds into
 
-- **Sprint 1** (`wiki/bridge-implementation-plan.md`) — the mock grows the multi-turn Collect contract + fixture arrivals; the agent grows the loop + `is_satisfied` gate; the real Bridge (local) is built behind the *same* `BridgeClient` port and the mock→real swap must be a no-op for the agent.
+- **Sprint 1** (`wiki/bridge-implementation-plan.md`) — the mock grows the multi-turn Collect contract + fixture arrivals; the agent grows the loop + `is_satisfied` gate; the real Bridge (local) is built and the mock→real / local→GCP swap must be a no-op for the agent. **Consumer construct changes in Sprint 1:** per `docs/decisions/adr-0009-native-a2a-consumer.md` the agent adopts the native `RemoteA2aAgent` (swap = a different Agent Card URL), and the M0 `BridgeClient` port becomes tracer-bullet-only — the Collect loop grows against `RemoteA2aAgent`, not behind the port. See `wiki/bridge-a2a-consumer.md`.

@@ -25,7 +25,7 @@ Bridge: chase the outstanding items ─┐
         ▲────────────────────────────┘  repeat until the app says done
 ```
 
-**The loop is idle-driven over long horizons.** A real casefile fills over days or **weeks**, so the loop is not a process that stays running — the continuation lives in the durable exchange, and each turn is triggered by a party arrival, a [[bridge-proactive|clock alarm]], or an HITL resume. Because the per-turn reply (`next_requirements`) is a pure function of `(status, ledger)`, neither side needs to *sit* in the loop between turns. See [[bridge-long-running|long-running collection]].
+**The loop is idle-driven over long horizons.** A real casefile fills over days or **weeks**, so the loop is not a process that stays running — the continuation lives in the durable exchange, and each turn is triggered by a party arrival, a [[bridge-proactive|clock alarm]], or an HITL resume. Because the per-turn reply (`next_requirements`) is a pure function of `(status, ledger)`, neither side needs to *sit* in the loop between turns. See [[bridge-long-running|long-running collection]]. On the calling side the loop runs as a [[bridge-a2a-consumer|native `RemoteA2aAgent` consumer]] that pauses on `INPUT_REQUIRED` between turns rather than blocking (`adr-0009`).
 
 **The Requirements payload is a list, not a language.** Each turn the agent returns a flat, fixed-schema to-do list — **data, not rules**:
 
@@ -57,4 +57,4 @@ The status vocabulary is the whole language: `required | optional | satisfied | 
 **Address and RFP are the *same* loop.** Both are exactly the multi-turn conversation above — the only difference is *how much the skill pins down up front*: Address gives a **fixed** rule the Bridge can best-effort and chase hard; RFP gives an **emergent** one the app mutates turn by turn. Either way the **app decides done** and the **Bridge code is the same** — the reusability thesis without a DSL. `Request (pull)` is just a one-turn Collect (one item, no follow-up).
 
 ## Related
-- [[bridge-patterns|patterns]], [[bridge-aggregate-model|aggregate model]], [[bridge-disposition|disposition]]
+- [[bridge-patterns|patterns]], [[bridge-aggregate-model|aggregate model]], [[bridge-disposition|disposition]], [[bridge-a2a-consumer|A2A consumer]]

@@ -43,6 +43,7 @@ updated: 2026-08-05
 - [[bridge-edges|two edges]] — A2A for agents, A2UI for humans
 - [[bridge-patterns|exchange patterns]] — Request / Negotiate / Deliver / Collect
 - [[bridge-long-running|long-running collection]] — the durable A2A task; days/weeks with no held connection
+- [[bridge-a2a-consumer|A2A consumer]] — how an agent calls the Bridge: `RemoteA2aAgent`, `input-required` pause, status updates
 - [[bridge-skills|skills]] — demos as configuration
 - [[bridge-gcp-substrate|GCP substrate]] — seams, network zones, deploy, proactive engine
 

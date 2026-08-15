@@ -92,6 +92,20 @@ importing `bridge`. But demo/console **furniture** (`two_run.py`, `timewarp_serv
 importable by `tests/` without path hacks. Keep the boundary at the *agent core*, not at "anything in
 the demo tree."
 
+### A11. The consumer construct is `RemoteA2aAgent`; `INPUT_REQUIRED` is a pause, not a failure
+Per `adr-0009`, our agents consume the Bridge via the **native `RemoteA2aAgent`**, not a hand-rolled
+A2A client + poll loop. Two traps ride on this:
+- **`INPUT_REQUIRED` is the resumable park signal, not an error.** The edge already emits it for a
+  not-yet-complete collection (`_status_for`: PENDING → `INPUT_REQUIRED`). `RemoteA2aAgent` turns it
+  into a zero-compute `LongRunningFunctionTool` pause resumed by an id-matched `FunctionResponse` — the
+  *same* durability as HITL. The M0 tracer client (`A2ABridgeClient._TERMINAL_FAILURE_STATES`)
+  deliberately treats it as terminal-failure because M0 is single-turn; **that guard must flip** when
+  the native consumer is adopted (Sprint 1). Don't carry M0's "input-required = fail" into the real loop.
+- **An empty `status.message` is silently dropped.** In-connection progress rides
+  `TaskStatusUpdateEvent.status.message`, but `a2a-sdk` 1.x carries an always-present *empty* proto
+  `Message` that ADK collapses to `None` — so a status update with no parts vanishes **with no error**.
+  Mock and real Bridge must attach a **non-empty** message; the seam suite must assert it round-trips.
+
 ### A10. Keep the "why" next to the invariant
 The load-bearing invariants above (A1–A9) are exactly the ones that were previously scattered across
 code comments and planning notes rather than the spec — the class of knowledge that silently rots
@@ -210,3 +224,10 @@ seam-parity story (local vs GCP adapters) holds.
   (the offline model double that makes CI deterministic).
 - **`a2a-sdk`** is load-bearing for the agent edge (canonical A2A). Pin it and track its release
   cadence / `[EXPERIMENTAL]` surfaces the same way. See `docs/decisions/adr-0001-stack.md`.
+- **`RemoteA2aAgent` (the consumer, `adr-0009`) is `@a2a_experimental` in `google-adk` 2.7.0.** It has
+  a legacy vs. new-integration-extension path (`use_legacy` flag; `_handle_a2a_response` vs `_v2`) —
+  **pin the mode** (default `use_legacy=True` until the new extension is validated against the mock)
+  and cover the consumer in the shared seam suite so a breaking change is caught immediately. The
+  spike to run before leaning on it: `input-required` → mock `LongRunningFunctionTool` pause →
+  `FunctionResponse` resume to the same `task_id`/`context_id`, plus a non-empty `status.message`
+  surfacing as a thought event.

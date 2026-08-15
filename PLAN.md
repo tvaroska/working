@@ -23,7 +23,7 @@
 
 **Definition of done:** the async round-trip runs locally, mock holds ~10s, agent renders the eval-sourced `id` + structured info; green test asserts payload + async path; contract models + `BridgeClient` port + mock committed (mock persists as the Sprint-1 contract double); agent is a real ADK `LlmAgent` and the edge is canonical A2A.
 
-**Validation gate:** contract sign-off with the design owner — are `CollectRequest` / `CollectionStatus` / `LedgerEntry` right, does the domain payload sit cleanly inside A2A parts, is `tasks/get` polling the async surface we want before push-notifications (Phase 3)? Sign-off de-risks Sprint 1.
+**Validation gate:** contract sign-off with the design owner — are `CollectRequest` / `CollectionStatus` / `LedgerEntry` right, does the domain payload sit cleanly inside A2A parts, is `tasks/get` polling the async surface we want before push-notifications (Phase 3)? Sign-off de-risks Sprint 1. *(The M0 hand-rolled `BridgeClient` poll loop is superseded from Sprint 1 by the native `RemoteA2aAgent` consumer — `docs/decisions/adr-0009-native-a2a-consumer.md`.)*
 
 ---
 
@@ -33,10 +33,11 @@ CI, dev-env setup, remaining project scaffolding, and stack + open-decision sign
 
 ## Then — Sprint 1 (Phase 1 local, agent-first)
 
-Grow the tracer bullet into the real thing behind the *same* `BridgeClient` port — mock→real swap must be a no-op for the agent:
+Grow the tracer bullet into the real thing — mock→real swap must be a no-op for the agent. **Consumer construct changes** here: per `adr-0009` the demos adopt the native `RemoteA2aAgent` and the M0 `BridgeClient` port becomes tracer-bullet-only (do **not** grow the Collect loop behind the port).
 
+- **Native A2A consumer (`adr-0009`)** — adopt `RemoteA2aAgent` (card-configured) as the Bridge consumer; contract redesign so the Bridge emits `INPUT_REQUIRED` on park (→ native `LongRunningFunctionTool` pause/resume) and `TaskStatusUpdateEvent` with a **non-empty** `status.message` on progress; flip the consumer's `INPUT_REQUIRED`-is-failure guard (`agents/src/bridge_client/a2a_client.py`); pin the integration-extension mode (`use_legacy=True` until validated) and cover it in the seam suite (`RemoteA2aAgent` is `@a2a_experimental`).
 - Address processing agent — multi-turn Collect loop + `is_satisfied` gate (`gov-id OR 2 distinct bills`).
-- Mock Bridge — multi-turn contract + fixture document arrivals + faked chase/timeout (the permanent contract double).
+- Mock Bridge — multi-turn contract + fixture document arrivals + faked chase/timeout, now emitting the `INPUT_REQUIRED` park + status-update progress above (the permanent contract double).
 - Frontend v1 — three surfaces + time-warp.
 - Real Bridge (local) — aggregate model, both edges, dual-path, fixture extraction graph, disposition + classification + issuer canonicalization, classified ledger, proactive (virtual clock), seam local adapters. Shared suite green across mock→real.
 

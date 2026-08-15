@@ -50,6 +50,8 @@ Nobody keeps a stream open for weeks. Canonical A2A decouples "learning of progr
 - **`tasks/resubscribe`** — re-attach to the event stream after the inevitable disconnect (a canonical-A2A verb the `a2a-sdk` provides).
 - **Push-notification config (webhooks)** — the *correct* long-running answer: the Bridge calls the servicer back on state change instead of anyone polling or streaming. **Deferred to Phase 4** today ([[bridge-a2a-edge]]); **weeks is the argument for pulling it forward**, since polling for weeks is wasteful and streams don't survive that long.
 
+**The caller pauses on the same native construct — for free.** A [[bridge-a2a-consumer|native consumer]] (`RemoteA2aAgent`) reads the Bridge's `INPUT_REQUIRED` (the park status the [[bridge-a2a-edge|edge]] already emits for a not-yet-complete collection) as a **`LongRunningFunctionTool` pause**: the caller's invocation ends with **zero compute**, the peer `task_id`/`context_id` persist on the [[bridge-aggregate-model|session]], and a later `FunctionResponse` (woken by push / a `tasks/get` check) resumes to the same task. So the *same* zero-compute suspend the Bridge uses internally for HITL spans the caller↔Bridge edge too — no second durability model to build (`adr-0009`). In-connection progress rides standard `TaskStatusUpdateEvent.status.message` (non-empty message required — an empty one is dropped by the SDK).
+
 ## The servicer loop is event-driven, not process-bound
 
 The Phase-1 agent-side `run_collect` is an in-process `async` loop with a `max_turns` cap — fine for a demo that finishes in seconds, but it **cannot span weeks** (the servicer process would have to stay alive throughout). Because `next_requirements` is a pure function of `(status, ledger)`, the servicer does not need to *sit* in the loop. The continuation lives in the **durable exchange**, not a process stack:
@@ -78,4 +80,4 @@ Weeks-scale forced four lifecycle decisions, recorded in `docs/decisions/adr-000
 - **Phase 3 (implementation):** the durable substrate (Vertex sessions, GCS artifacts, Cloud Tasks timers, persisted SLA read-model) plus the `adr-0008` mechanisms — none built yet.
 
 ## Related
-- [[bridge-a2a-edge|A2A edge]], [[bridge-collect|Collect]], [[bridge-proactive|proactive follow-up]], [[bridge-aggregate-model|aggregate model]]
+- [[bridge-a2a-edge|A2A edge]], [[bridge-a2a-consumer|A2A consumer]], [[bridge-collect|Collect]], [[bridge-proactive|proactive follow-up]], [[bridge-aggregate-model|aggregate model]]

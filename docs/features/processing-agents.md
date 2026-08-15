@@ -16,7 +16,7 @@ The mock Bridge is a **maintained artifact, not throwaway** — agent regression
 
 ## Build components (Release 1)
 
-- Address processing agent — the Collect loop runs as an `LlmAgent` on ADK (the LLM chooses which proof to request; a deterministic `is_satisfied` code gate owns "done" — `gov-id OR 2 distinct bills`), emitting a per-turn requirements list (`agents/src/agents/address/`). The loop is transport- and policy-agnostic behind a `BridgeClient` port, which is what makes the mock→real swap a no-op for the agent core.
+- Address processing agent — the Collect loop runs as an `LlmAgent` on ADK (the LLM chooses which proof to request; a deterministic `is_satisfied` code gate owns "done" — `gov-id OR 2 distinct bills`), emitting a per-turn requirements list (`agents/src/agents/address/`). It consumes the Bridge over canonical A2A via the native `RemoteA2aAgent` (card-configured), so the mock→real / local→GCP swap is a **different Agent Card URL**, not different agent code (`docs/decisions/adr-0009-native-a2a-consumer.md`). *(The M0 tracer bullet used a hand-rolled `BridgeClient` port + `A2ABridgeClient` poll loop as its hermetic double; that is superseded from Sprint 1 — the Collect loop grows against `RemoteA2aAgent`, not behind the port.)*
 - Mock Document Bridge — the A2A multi-turn contract, fixture arrivals, ledger reporting, faked chase/timeout (`agents/src/agents/mock_bridge/`); the permanent contract double. Parity with the real Bridge is **terminal-outcome, not ledger-identical** (`docs/lessons-learned.md §A2`).
 
 Later-release agents (Benefits, RFP, simulated ADK/LangGraph carriers) are Release 2+.

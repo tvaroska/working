@@ -15,7 +15,7 @@ An address `LlmAgent` asks a mock Document Bridge once and receives back an eval
 agents/
   src/
     contract/          Pydantic models: CollectRequest, ExchangeTurn, CollectionStatus, LedgerEntry
-    bridge_client/     BridgeClient port + A2A adapter (message/send → tasks/get polling)
+    bridge_client/     BridgeClient port + A2A adapter (message/send → tasks/get polling) — M0 tracer-bullet double; superseded from Sprint 1 by native RemoteA2aAgent (adr-0009)
     agents/
       mock_bridge/     a2a-sdk mock server (permanent Sprint-1 contract double)
       address/         Address LlmAgent + manual driver
@@ -88,3 +88,4 @@ uv run ruff check
 - [`../PLAN.md`](../PLAN.md) — active development tracker (Milestone 0)
 - [`../docs/milestone-0-contract-tracer.md`](../docs/milestone-0-contract-tracer.md) — M0 spec
 - [`../wiki/bridge.md`](../wiki/bridge.md) — root of the design spec
+- [`../wiki/bridge-a2a-consumer.md`](../wiki/bridge-a2a-consumer.md) / [`../docs/decisions/adr-0009-native-a2a-consumer.md`](../docs/decisions/adr-0009-native-a2a-consumer.md) — the native `RemoteA2aAgent` consumer that supersedes this port from Sprint 1

@@ -27,6 +27,7 @@ Concretely, each concern lands on its native construct:
 | Orchestration / turns | stock `Runner` | a service that hides a runner |
 | A capability the agent invokes | a **tool** (`FunctionTool`) | inline branching in app code |
 | A sub-capability that reasons | a subagent as **`AgentTool`** | inlining its reasoning into the parent |
+| Calling another A2A agent (e.g. the Bridge) | **`RemoteA2aAgent`** (card-configured) | a hand-rolled A2A client + poll loop in a `FunctionTool` |
 | Pause for a human | `LongRunningFunctionTool` + id-matched `FunctionResponse` | app-owned task-parking |
 | A document (bytes) | **artifact** (`ArtifactService`, versioned) | an inline payload on session state |
 | Durable session / state | `SessionService` | a bespoke store adapter |
@@ -73,9 +74,10 @@ This keeps the A2A message small and the trust boundary honest: a reference is n
 ## Read next
 - [[bridge-disposition|disposition]] — the KYC decision the gate tool wraps
 - [[bridge-collect|Collect]] — the same LLM-drives / code-gates split on the client side
+- [[bridge-a2a-consumer|A2A consumer]] — the native construct for calling *another* A2A agent (`RemoteA2aAgent`)
 - [[bridge-artifacts|artifacts]] — documents as versioned ADK artifacts, and how they cross the wire
 - [[bridge-gcp-substrate|GCP substrate]] — the service backends that swap in on deploy
 
 ## Related
-- [[bridge-patterns|exchange patterns]], [[bridge|the Bridge]]
-- **Decision record:** `docs/decisions/adr-0001-stack.md`
+- [[bridge-patterns|exchange patterns]], [[bridge|the Bridge]], [[bridge-a2a-consumer|A2A consumer]]
+- **Decision record:** `docs/decisions/adr-0001-stack.md`, `docs/decisions/adr-0009-native-a2a-consumer.md`
