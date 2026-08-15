@@ -71,11 +71,14 @@ def test_executor_emits_working_then_completed():
 
     asyncio.run(executor.execute(context, queue))
 
-    # Assert event sequence: WORKING -> artifact -> COMPLETED
-    assert len(queue.events) >= 3
-    # First event: WORKING
+    # Assert event sequence: Task(SUBMITTED) -> WORKING -> artifact -> COMPLETED
+    assert len(queue.events) >= 4
+    # First event: Task with SUBMITTED state
     assert hasattr(queue.events[0], "status")
-    assert queue.events[0].status.state == TaskState.TASK_STATE_WORKING
+    assert queue.events[0].status.state == TaskState.TASK_STATE_SUBMITTED
+    # Second event: WORKING
+    assert hasattr(queue.events[1], "status")
+    assert queue.events[1].status.state == TaskState.TASK_STATE_WORKING
 
     # Find the artifact event
     artifact_event = None

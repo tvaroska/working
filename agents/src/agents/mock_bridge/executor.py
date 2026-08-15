@@ -10,6 +10,7 @@ import asyncio
 from a2a.helpers.proto_helpers import new_data_part
 from a2a.server.agent_execution import AgentExecutor
 from a2a.server.tasks import TaskUpdater
+from a2a.types import Task, TaskState, TaskStatus
 
 from contract import LedgerEntry
 
@@ -36,15 +37,24 @@ class MockBridgeExecutor(AgentExecutor):
         self._hold_seconds = hold_seconds
 
     async def execute(self, context, event_queue):
-        """Execute the mock collect: WORKING -> hold -> artifact -> COMPLETED.
+        """Execute the mock collect: Task -> WORKING -> hold -> artifact -> COMPLETED.
 
         Args:
             context: Request context carrying task_id and context_id.
             event_queue: Event queue for emitting status updates.
         """
+        # First, enqueue a Task object (required by a2a-sdk for async workflows).
+        # This must happen BEFORE any TaskStatusUpdateEvents.
+        task = Task(
+            id=context.task_id,
+            context_id=context.context_id,
+            status=TaskStatus(state=TaskState.TASK_STATE_SUBMITTED),
+        )
+        await event_queue.enqueue_event(task)
+
         updater = TaskUpdater(event_queue, context.task_id, context.context_id)
 
-        # Emit WORKING first (so message/send with return_immediately returns
+        # Emit WORKING (so message/send with return_immediately returns
         # immediately), then hold. Sleeping BEFORE start_work() would delay the
         # send response by hold_seconds and defeat the async poll surface.
         await updater.start_work()
