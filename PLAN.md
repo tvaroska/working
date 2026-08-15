@@ -39,11 +39,12 @@
   3. Path filters so a docs-only PR skips code jobs; `bridge/`-vs-`agents/` isolation guard test (S0.2) runs in the core job.
   4. Add a **SDK-pin drift** guard: `test_scaffold.py` already asserts the `google-adk` range — surface its failure clearly (ADR-0001 SDK risk). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.1-ci-pipeline.md)_
 
-- [ ] **S0.2 — `bridge/` core project scaffold.** The reusable core as a **separate** uv project (the showcase artifact; "the difference between demos is the agent, not the Bridge").
+- [x] **S0.2 — `bridge/` core project scaffold.** The reusable core as a **separate** uv project (the showcase artifact; "the difference between demos is the agent, not the Bridge").
   1. `bridge/pyproject.toml` (src layout, own `uv.lock`), same pins as `agents/`; `bridge/src/bridge/__init__.py` placeholder + `bridge/tests/`.
   2. **Decide contract-type sharing** (open decision → sign-off, S0.8): recommended = a **shared `contract` package** both `agents/` and `bridge/` depend on (neither imports the other — the invariant `bridge/` never imports `agents/` is preserved; a shared *third* package is allowed). Alternative = duplicate-by-discipline. Record the choice in an ADR before moving `contract` out of `agents/src/`.
   3. **Isolation guard test** (`bridge/tests/test_no_agents_import.py`): assert `import bridge` pulls in **no** `agents.*` module (scan `sys.modules`), locking the invariant in CI.
   4. Note the parity discipline: canonicalization/disposition logic is kept in parity between `bridge/` and `agents/` **by the shared seam suite**, not by import.
+  _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.2-bridge-core-scaffold.md)_
 
 - [ ] **S0.3 — Seam test harness convention.** Establish the "**one shared suite, two adapters**" pattern before any seam is built (Sprint 1 designs interfaces; Sprint 2 adds GCP impls).
   1. `tests/support/seams.py` (or a `conftest.py` fixture): a parametrized `adapter` fixture yielding `local` always and `gcp` only when credentials are present (else `pytest.skip`) — so the *same* test asserts both.
