@@ -14,7 +14,7 @@
 **Out of scope (deferred to Sprint 1+):** Collect loop, `is_satisfied` gate, disposition/classification/canonicalization, real Gemini extraction, chase/scheduler/HITL, frontend, GCP/Terraform, skills registry, persistence.
 
 - [x] **M0.1 — Scaffold.** `uv` project, Python 3.12+, `agents/` package; pin `google-adk >= 2.7.0,<3` and `a2a-sdk`; add pytest + ruff. (Minimal slice of Sprint-0 scaffolding — only what M0 needs.) _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/M0.1-scaffold.md)_
-- [ ] **M0.2 — Contract models** (`agents/src/contract/`). Pydantic `CollectRequest`, `ExchangeTurn`, `CollectionStatus`, `LedgerEntry`, extraction `fields`; field names mirror `wiki/evals/address/expected.json`. *(The artifact under validation.)*
+- [x] **M0.2 — Contract models** (`agents/src/contract/`). Pydantic `CollectRequest`, `ExchangeTurn`, `CollectionStatus`, `LedgerEntry`, extraction `fields`; field names mirror `wiki/evals/address/expected.json`. *(The artifact under validation.)* _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/M0.2-contract-models.md)_
 - [ ] **M0.3 — `BridgeClient` port.** Transport-agnostic `collect(request) -> ExchangeTurn`, with an `a2a-sdk` impl doing `message/send` + `tasks/get` polling.
 - [ ] **M0.4 — Mock Document Bridge** (`agents/src/agents/mock_bridge/`). `a2a-sdk` server: on send, create in-memory task → `WORKING` → hold ~10s (configurable) → `COMPLETED` with a `CollectionStatus` whose `LedgerEntry` is loaded from the address evals. Serve a minimal Agent Card.
 - [ ] **M0.5 — Address `LlmAgent` scaffold** (`agents/src/agents/address/`). `google-adk` `LlmAgent`, `BridgeClient` wired as tool/port; one turn: request `address-proof` for `jordan-lee`, await result, render `id` + structured info.

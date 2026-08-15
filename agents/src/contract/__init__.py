@@ -1,1 +1,21 @@
 """Contract types for the A2A Document Bridge (domain models shared by agents and Bridge)."""
+
+from .models import (
+    CollectionStatus,
+    CollectRequest,
+    Disposition,
+    ExchangeTurn,
+    ExtractedFields,
+    Extraction,
+    LedgerEntry,
+)
+
+__all__ = [
+    "CollectRequest",
+    "CollectionStatus",
+    "Disposition",
+    "Extraction",
+    "ExtractedFields",
+    "ExchangeTurn",
+    "LedgerEntry",
+]
