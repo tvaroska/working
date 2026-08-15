@@ -199,7 +199,8 @@ def test_two_bills_scenario_steps():
 def test_executor_two_bills_multiturn():
     """Executor drives TWO_BILLS scenario: round 1 not terminal, round 2 terminal."""
     from a2a.helpers.proto_helpers import get_message_text
-    from agents.mock_bridge import MockBridgeExecutor, TWO_BILLS
+
+    from agents.mock_bridge import TWO_BILLS, MockBridgeExecutor
 
     class FakeQueue:
         def __init__(self):
@@ -217,7 +218,9 @@ def test_executor_two_bills_multiturn():
 
     # At least one WORKING event has a non-empty status.message (faked chase).
     working_events = [
-        e for e in queue1.events if hasattr(e, "status") and e.status.state == TaskState.TASK_STATE_WORKING
+        e
+        for e in queue1.events
+        if hasattr(e, "status") and e.status.state == TaskState.TASK_STATE_WORKING
     ]
     assert len(working_events) > 0
     chase_found = any(
