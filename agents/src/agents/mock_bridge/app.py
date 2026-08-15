@@ -46,8 +46,7 @@ def build_agent_card(base_url: str) -> AgentCard:
         ],
         capabilities=AgentCapabilities(
             # streaming=True so the native RemoteA2aAgent consumer can receive
-            # progress TaskStatusUpdateEvents (adr-0009). The M0 BridgeClient port
-            # is unaffected — it forces ClientConfig(streaming=False, polling=True).
+            # progress TaskStatusUpdateEvents (adr-0009).
             streaming=True,
             push_notifications=False,
         ),

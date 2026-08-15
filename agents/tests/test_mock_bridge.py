@@ -51,7 +51,7 @@ def test_build_exchange_turn():
 def test_executor_emits_working_then_completed():
     """Drive the executor with a fake event queue; assert WORKING precedes COMPLETED.
 
-    This proves the emitted wire shape matches what A2ABridgeClient.task_to_exchange_turn
+    This proves the emitted wire shape matches what ``wire.task_to_exchange_turn``
     reads — parity by discipline.
     """
     from agents.mock_bridge import MockBridgeExecutor

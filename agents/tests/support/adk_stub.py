@@ -1,14 +1,12 @@
-"""Test doubles for driving the real ``LlmAgent`` offline (no sockets, no API key).
+"""Test double for driving the real ``LlmAgent`` offline (no Gemini call).
 
-- :class:`ScriptedToolCallModel` is a ``BaseLlm`` that keys off a call counter to
-  drive ADK's function-calling loop deterministically: call #1 emits the tool
-  ``function_call``; later calls emit a fixed final text part. This lets the real
-  ``LlmAgent`` + ``Runner`` run the true tool->port path with no Gemini call.
-- :class:`FakeBridgeClient` is a ``BridgeClient`` port double returning a canned
-  ``gov-id-clean`` turn and recording the request it received.
-
-Importing ``agents.mock_bridge`` from *test* code is fine (the agent itself must
-never import it — that discipline is enforced in ``agents.address``).
+:class:`ScriptedTransferModel` is a ``BaseLlm`` that keys off a call counter to
+drive ADK's agent-transfer flow deterministically: call #1 emits a
+``transfer_to_agent`` ``function_call`` handing control to the Bridge sub-agent;
+any later call emits a fixed final text part (a safety net — after transfer the
+sub-agent normally produces the output and the parent model is not re-invoked).
+This lets the real ``google-adk`` ``LlmAgent`` + ``Runner`` run the true
+transfer -> native ``RemoteA2aAgent`` path with no API key.
 """
 
 from collections.abc import AsyncGenerator
@@ -17,16 +15,12 @@ from google.adk.models import BaseLlm, LlmResponse
 from google.genai import types
 from pydantic import PrivateAttr
 
-from agents.mock_bridge import build_exchange_turn, load_gov_id_clean_entry
-from bridge_client import BridgeClient
-from contract import CollectRequest, ExchangeTurn
 
-
-class ScriptedToolCallModel(BaseLlm):
-    """A ``BaseLlm`` stub that scripts one function call then a final text part."""
+class ScriptedTransferModel(BaseLlm):
+    """A ``BaseLlm`` stub that scripts one ``transfer_to_agent`` call."""
 
     model: str = "scripted-stub"
-    tool_name: str = "collect_address_proof"
+    target_agent: str = "document_bridge"
     final_text: str = "Collected the address proof."
 
     _call_count: int = PrivateAttr(default=0)
@@ -42,7 +36,10 @@ class ScriptedToolCallModel(BaseLlm):
                 role="model",
                 parts=[
                     types.Part(
-                        function_call=types.FunctionCall(name=self.tool_name, args={})
+                        function_call=types.FunctionCall(
+                            name="transfer_to_agent",
+                            args={"agent_name": self.target_agent},
+                        )
                     )
                 ],
             )
@@ -52,16 +49,3 @@ class ScriptedToolCallModel(BaseLlm):
                 parts=[types.Part(text=self.final_text)],
             )
         yield LlmResponse(content=content)
-
-
-class FakeBridgeClient(BridgeClient):
-    """A ``BridgeClient`` port double returning a canned ``gov-id-clean`` turn."""
-
-    def __init__(self, *, context_id: str = "fake-ctx-001") -> None:
-        self._context_id = context_id
-        self.requests: list[CollectRequest] = []
-
-    async def collect(self, request: CollectRequest) -> ExchangeTurn:
-        self.requests.append(request)
-        entry = load_gov_id_clean_entry()
-        return build_exchange_turn(self._context_id, entry)

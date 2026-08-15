@@ -1,6 +1,6 @@
 """S1-1 — Native A2A consumer + park/resume contract (adr-0009).
 
-Three layers of seam coverage for the Sprint-1 consumer switch:
+Two layers of seam coverage for the native consumer:
 
 - **Test A (contract-level, no ADK):** a raw a2a-sdk client proves the wire
   contract — first turn WORKING -> INPUT_REQUIRED (park) with a non-empty
@@ -10,15 +10,14 @@ Three layers of seam coverage for the Sprint-1 consumer switch:
   as a root agent turns the park into a paused ``LongRunningFunctionTool`` call,
   then a ``FunctionResponse`` resumes the same A2A task and returns the payload.
   This is the adr-0009 "spike before leaning on the experimental construct."
-- **Test C (port guard):** the M0 ``BridgeClient`` port surfaces a park as
-  ``BridgeParkedError`` — park is not a failure, and the port must not hang.
+
+The address agent wires this same ``RemoteA2aAgent`` as a sub-agent; that
+end-to-end path is covered by ``test_round_trip.py``.
 """
 
 import asyncio
-import json
 
 import httpx
-import pytest
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.helpers.proto_helpers import (
     get_data_parts,
@@ -33,13 +32,9 @@ from a2a.types import (
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
-from bridge_client import (
-    A2ABridgeClient,
-    BridgeParkedError,
-    build_bridge_remote_agent,
-    request_to_message,
-)
+from bridge_client import build_bridge_remote_agent, request_to_message
 from contract import CollectRequest
+from tests.support.a2a_helpers import extract_exchange_turn
 from tests.support.live_server import LiveMockServer
 
 PARTY = "jordan-lee"
@@ -153,35 +148,6 @@ def test_park_resume_contract_raw():
 # --------------------------------------------------------------------------- #
 
 
-_A2A_START = b"<a2a_datapart_json>"
-_A2A_END = b"</a2a_datapart_json>"
-
-
-def _extract_exchange_turn(events) -> dict | None:
-    """Find a gov-id-clean ExchangeTurn embedded in any event's inline data.
-
-    Generic A2A data parts arrive as an inline blob wrapped in ADK's data-part
-    tags (see ``convert_a2a_part_to_genai_part``); unwrap and JSON-parse it.
-    """
-    for event in events:
-        if not (event.content and event.content.parts):
-            continue
-        for part in event.content.parts:
-            blob = getattr(part, "inline_data", None)
-            if blob is None or not blob.data:
-                continue
-            raw = blob.data
-            if _A2A_START in raw and _A2A_END in raw:
-                raw = raw.split(_A2A_START, 1)[1].split(_A2A_END, 1)[0]
-            try:
-                data = json.loads(raw)
-            except (ValueError, TypeError):
-                continue
-            if isinstance(data, dict) and data.get("status", {}).get("ledger"):
-                return data
-    return None
-
-
 def _find_paused_call(events):
     """Return the (function_call) that paused the runner, or None."""
     for event in events:
@@ -243,7 +209,7 @@ async def _drive_remote_agent(card_url: str):
                 )
             ]
 
-        return paused, _extract_exchange_turn(first + resumed)
+        return paused, extract_exchange_turn(first + resumed)
 
 
 def test_remote_agent_park_resume_spike():
@@ -254,20 +220,3 @@ def test_remote_agent_park_resume_spike():
     assert paused is not None, "RemoteA2aAgent did not pause on the INPUT_REQUIRED park"
     assert payload is not None, "no ExchangeTurn returned after resume"
     assert payload["status"]["ledger"][0]["id"] == "gov-id-clean"
-
-
-# --------------------------------------------------------------------------- #
-# Test C — port guard (park is not a failure, and must not hang)
-# --------------------------------------------------------------------------- #
-
-
-def test_port_raises_parked_error_on_park():
-    """Test C — the M0 port surfaces a park as BridgeParkedError."""
-
-    async def _run():
-        async with A2ABridgeClient(server.base_url, poll_interval=0.02) as client:
-            await client.collect(CollectRequest(party=PARTY, skill=SKILL))
-
-    with LiveMockServer(hold_seconds=0.2, park=True) as server:
-        with pytest.raises(BridgeParkedError):
-            asyncio.run(_run())

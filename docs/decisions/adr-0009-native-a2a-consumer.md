@@ -1,8 +1,8 @@
 # ADR-0009 — Native A2A consumer (`RemoteA2aAgent`) + wait/progress expressed on the wire
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-08-15 — port removed, see Amendment)
 - **Date:** 2026-08-15
-- **Supersedes (consumer side):** the hand-rolled `BridgeClient` port + `A2ABridgeClient` + `FunctionTool` consumer introduced for the M0 tracer bullet (`agents/src/bridge_client/`, M0.3/M0.5) — as the *target*; M0 keeps it (see Note).
+- **Supersedes (consumer side):** the hand-rolled `BridgeClient` port + `A2ABridgeClient` + `FunctionTool` consumer introduced for the M0 tracer bullet (`agents/src/bridge_client/`, M0.3/M0.5). Originally retained for M0; **now removed** (see Amendment).
 - **Context:** `docs/decisions/adr-0001-stack.md`, `docs/decisions/adr-0008-long-running-collection-lifecycle.md`, `wiki/bridge-adk.md`, `wiki/bridge-a2a-edge.md`, `wiki/bridge-long-running.md`; installed `google-adk == 2.7.0` (`google/adk/agents/remote_a2a_agent.py`), `a2a-sdk` 1.1.x.
 
 ## Context
@@ -64,10 +64,10 @@ The three mechanisms compose and each keeps its ADR-0008 role:
 
 - **`RemoteA2aAgent` is `@a2a_experimental`.** It is decorated experimental in ADK 2.7.0. This lands squarely under ADR-0001's SDK-risk item: pin `google-adk`, track the `[EXPERIMENTAL]` surface, and cover the consumer in the shared seam suite so a breaking change is caught immediately.
 - **Overloading `input-required` is a real semantic bet.** A2A conventionally reads `input-required` as "the *caller* must supply input." We use it for "parked, awaiting a third party." Consumers built by others may render it as a prompt-the-user state. Mitigation: document the convention on the Agent Card / skill description, and keep the resume tolerant of an empty ack. If this proves confusing for external A2A callers, revisit (a future A2A `working`-with-push variant, or the new integration extension, may express "parked but not caller-blocked" more precisely).
-- **The `BridgeClient` port + `A2ABridgeClient` become tracer-bullet-only.** They are not deleted by this ADR (M0 depends on them; see Note), but they are no longer the target consumer. Sprint 1 must not grow the Collect loop *behind* the port; it grows against `RemoteA2aAgent`. `docs/features/processing-agents.md` and the M0 run doc should be annotated to say the port is the M0 double, superseded here.
+- **The `BridgeClient` port + `A2ABridgeClient` become tracer-bullet-only** — and were **subsequently removed** (see Amendment). They were no longer the target consumer; Sprint 1 grows against `RemoteA2aAgent`, not behind the port.
 - **Contract redesign is now Sprint-1 scope.** The mock Bridge and real Bridge must emit `input-required` on park + `TaskStatusUpdateEvent` with non-empty `status.message` on progress, and support resume to the same `task_id`. The M0 mock (permanent contract double per CLAUDE.md) grows these behaviors; parity stays terminal-outcome, not ledger-identical.
 - **Empty-message drop is a silent failure mode.** A status update with no parts vanishes with no error. The seam suite must assert a non-empty `status.message` round-trips and surfaces as a thought event.
-- **`input-required` is currently treated as a failure.** `A2ABridgeClient._TERMINAL_FAILURE_STATES` includes `INPUT_REQUIRED`/`AUTH_REQUIRED`. That is correct for M0 (no multi-turn) but is the exact behavior this ADR inverts for the target; the switch happens with the `RemoteA2aAgent` adoption, not before.
+- **`input-required` was treated as a failure by the removed port.** `A2ABridgeClient` raised `BridgeParkedError` on `INPUT_REQUIRED`/`AUTH_REQUIRED` (correct for M0's no-resume poll loop). `RemoteA2aAgent` inverts this natively — a park becomes a `LongRunningFunctionTool` pause — so with the port gone there is no failure guard to flip.
 
 ## Alternatives considered
 
@@ -78,4 +78,13 @@ The three mechanisms compose and each keeps its ADR-0008 role:
 
 ## Note
 
-This ADR governs the **consumer side** (how our agents call the Bridge) and the **wire vocabulary** the Bridge must emit to make the native consumer effective. It does not change ADR-0001's runtime/transport choices or ADR-0008's lifecycle policy — it *uses* them: `RemoteA2aAgent` (native ADK), `input-required`+resume (native `LongRunningFunctionTool` durability), `TaskStatusUpdateEvent` and `PushNotificationConfig` (standard A2A). **M0 is unchanged**: the tracer bullet keeps the `BridgeClient` port + `A2ABridgeClient` poll loop as its hermetic double; this ADR is the target that supersedes it from Sprint 1. See `wiki/bridge-a2a-edge.md`, `wiki/bridge-long-running.md`.
+This ADR governs the **consumer side** (how our agents call the Bridge) and the **wire vocabulary** the Bridge must emit to make the native consumer effective. It does not change ADR-0001's runtime/transport choices or ADR-0008's lifecycle policy — it *uses* them: `RemoteA2aAgent` (native ADK), `input-required`+resume (native `LongRunningFunctionTool` durability), `TaskStatusUpdateEvent` and `PushNotificationConfig` (standard A2A). See `wiki/bridge-a2a-edge.md`, `wiki/bridge-long-running.md`.
+
+## Amendment (2026-08-15) — port removed; address agent consumes the Bridge as a sub-agent
+
+The original decision phased the switch (keep the M0 port as a permanent hermetic double, adopt the native consumer from Sprint 1). Once the wire contract was validated, the port was **removed outright** rather than retained:
+
+- **Deleted:** `bridge_client/port.py` (`BridgeClient`, `BridgeClientError`, `BridgeParkedError`, `BridgeTimeoutError`) and `bridge_client/a2a_client.py` (`A2ABridgeClient`), plus their tests (`test_bridge_client.py`, the port-guard "Test C" in `test_native_consumer.py`). The reusable A2A wire helpers (`request_to_message`, `task_to_exchange_turn`) moved to `bridge_client/wire.py`; the raw-client wire-contract test (Test A) still exercises them.
+- **Address agent wiring:** `build_address_agent(bridge_card_url)` now attaches the `RemoteA2aAgent` (`document_bridge`) as a **`sub_agent`**; the model delegates via ADK's injected `transfer_to_agent`, and the Bridge relays its `ExchangeTurn` back as the turn output. There is no `FunctionTool`/`collect()` wrapper.
+- **Open consequence — structured `CollectRequest` on the send path.** Under transfer, the consumer forwards conversation content, not a JSON `CollectRequest` DataPart, so the structured outbound request no longer travels on the agent's send. The mock Bridge is content-agnostic, so the M0 round-trip still passes; carrying `CollectRequest` (and post-processing the returned ledger for the `is_satisfied` gate — which needs control to return to the address agent, e.g. via `AgentTool` or a follow-up root turn) is **Sprint-1 work**.
+- **Unchanged:** the wire vocabulary (§2–§4), `use_legacy=True` pin (§5), and the experimental-surface risk all still hold.

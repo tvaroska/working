@@ -1,27 +1,24 @@
-"""The transport-agnostic ``BridgeClient`` port and its ``a2a-sdk`` adapter.
+"""The native ``RemoteA2aAgent`` Bridge consumer and pure A2A wire helpers.
 
-The agent core depends only on the :class:`BridgeClient` port; the
-:class:`A2ABridgeClient` adapter implements it over the canonical A2A surface.
-This package imports only ``contract`` + stdlib + ``a2a-sdk`` + ``httpx`` and must
-never import anything under ``agents.*`` (the client seam is agent-agnostic).
+Our agents consume the Bridge through ADK's platform-native ``RemoteA2aAgent``
+(adr-0009): the mock->real and local->GCP swap is a **different Agent Card URL**,
+not different agent code. The M0 hand-rolled ``BridgeClient`` port + poll loop was
+removed once the wire contract was validated (see adr-0009 amendment).
+
+This package imports only ``contract`` + stdlib + ``a2a-sdk`` + ``httpx`` +
+``google-adk`` and must never import anything under ``agents.*``.
 """
 
-from .a2a_client import A2ABridgeClient, request_to_message, task_to_exchange_turn
-from .port import (
-    BridgeClient,
-    BridgeClientError,
-    BridgeParkedError,
-    BridgeTimeoutError,
-)
 from .remote_consumer import build_bridge_remote_agent
+from .wire import (
+    BridgeWireError,
+    request_to_message,
+    task_to_exchange_turn,
+)
 
 __all__ = [
-    "BridgeClient",
-    "BridgeClientError",
-    "BridgeParkedError",
-    "BridgeTimeoutError",
-    "A2ABridgeClient",
     "build_bridge_remote_agent",
+    "BridgeWireError",
     "request_to_message",
     "task_to_exchange_turn",
 ]

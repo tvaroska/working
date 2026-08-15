@@ -28,6 +28,19 @@ An agent consumes the Bridge by instantiating **`RemoteA2aAgent`** against the B
 
 The reusability thesis is unchanged — *the difference between demos is the agent, not the Bridge* ([[bridge|core vs demos]]). Each demo points a `RemoteA2aAgent` at the same unchanged Bridge card; the mock→real and local→GCP swaps are a **different card URL**, not different agent code.
 
+## Wiring into the caller: transfer vs. call-and-return
+
+`RemoteA2aAgent` is *what* consumes the Bridge; **how it hangs off the caller** is a second, consequential choice, because it decides whether control comes **back**:
+
+| Wiring | Semantics | Control after the Bridge returns |
+|---|---|---|
+| **`sub_agents` + `transfer_to_agent`** | the caller **hands over** control to the Bridge sub-agent; the Bridge's relayed `ExchangeTurn` becomes the turn output | **does not return** to the caller — the turn ends at the sub-agent (a `RemoteA2aAgent` issues no transfer-back) |
+| **`AgentTool`** | the caller **calls** the Bridge as a tool and **keeps** control; the `ExchangeTurn` comes back as the tool result | **returns** to the caller, which can post-process and loop |
+
+The M0 tracer bullet uses **transfer** (`sub_agents`): thinnest one-shot delegation, no post-processing. But the [[bridge-collect|Collect]] loop's completeness decision (**`is_satisfied` — the app owns "done"**, Sense B) has to run **in the caller, after the Bridge returns its ledger**, then chase the next proof or stop. That post-processing loop needs control to come back — so the completeness-gated flow adopts **`AgentTool`** (or a follow-up root turn); transfer alone can't host the gate. This is a deliberate Sprint-1 switch, not the M0 default. See `adr-0009` (amendment) and [[bridge-collect]].
+
+A second consequence of transfer: it forwards **conversation content**, not a structured `CollectRequest` DataPart — so the typed outbound request leaves the send path under M0's transfer wiring. Restoring it (carrying `CollectRequest` as a JSON part) rides along with the `AgentTool` switch.
+
 ## Two mechanisms for long-running work
 
 A collection runs for [[bridge-long-running|days or weeks]]. `RemoteA2aAgent` supports that through two standard mechanisms, and the **Bridge's task status is what selects which one the caller gets**:
@@ -55,15 +68,16 @@ Live progress rides the standard streaming event: a **`TaskStatusUpdateEvent` ca
 | weeks-scale wakeup | callback | `PushNotificationConfig` (Phase 3, `adr-0008`) |
 | terminal | deliverable | `ExchangeTurn` artifact on `COMPLETED` |
 
-## M0 note — the port is the tracer-bullet double, superseded here
+## M0 note — the port was removed; the consumer is now native
 
-The [[bridge-collect|Collect]] tracer bullet (M0) consumes the Bridge through a hand-rolled `BridgeClient` port + `A2ABridgeClient` (a blocking `message/send` → `tasks/get` poll loop) wrapped in a `FunctionTool` (`agents/src/bridge_client/`). That was the right *hermetic tracer-bullet* choice. Per `adr-0009` it is **superseded from Sprint 1** by `RemoteA2aAgent`; Sprint 1 grows the Collect loop against the native consumer, **not** behind the port. M0 itself is unchanged.
+The [[bridge-collect|Collect]] tracer bullet (M0) originally consumed the Bridge through a hand-rolled `BridgeClient` port + `A2ABridgeClient` (a blocking `message/send` → `tasks/get` poll loop) wrapped in a `FunctionTool`. Once the wire contract was validated the port was **removed** (not merely tracer-bullet-only): the address agent now consumes the Bridge as a native `RemoteA2aAgent` wired as a **`sub_agent`** (`agents/src/bridge_client/build_bridge_remote_agent`), and the pure A2A wire helpers survive in `bridge_client/wire.py`. This goes beyond the original `adr-0009` (which retained the port as a permanent double) — recorded in the **adr-0009 amendment (2026-08-15)**. Sprint 1 grows the Collect loop against the native consumer, switching the wiring from transfer to `AgentTool` for the completeness gate (above).
 
 ## Status
 
 - **Decided (`adr-0009`):** `RemoteA2aAgent` is the canonical consumer; waits are `input-required` (native pause), progress is `TaskStatusUpdateEvent.status.message`, integration-extension mode pinned (`use_legacy=True` until validated).
 - **Committed / already in the edge:** `_status_for` maps a pending collection → `INPUT_REQUIRED` ([[bridge-a2a-edge]]); native HITL pause/resume ([[bridge-adk]]).
-- **Sprint 1 (implementation):** adopt `RemoteA2aAgent` in the demos; mock + real Bridge emit `input-required` on park + non-empty `status.message` on progress; flip the consumer's `INPUT_REQUIRED`-is-failure guard. None built yet.
+- **Landed (2026-08-15):** the address agent consumes the Bridge as a native `RemoteA2aAgent` **sub-agent** (transfer); the M0 `BridgeClient` port was removed (adr-0009 amendment). Mock park (`INPUT_REQUIRED`) + non-empty `status.message` progress are covered by the seam suite.
+- **Sprint 1 (remaining):** switch the wiring from transfer to **`AgentTool`** so control returns for the **`is_satisfied`** gate; restore the structured `CollectRequest` on the send path; grow the multi-turn Collect loop. See `PLAN.md`.
 - **Risk:** `RemoteA2aAgent` is `@a2a_experimental` in `google-adk` 2.7.0 — pin and cover in the shared seam suite (`docs/decisions/adr-0001-stack.md`).
 
 ## Related

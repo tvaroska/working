@@ -1,9 +1,9 @@
 """The native ``RemoteA2aAgent`` Bridge consumer (adr-0009).
 
-From Sprint 1 the demos consume the Bridge through ADK's platform-native
-``RemoteA2aAgent`` rather than the M0 hand-rolled :class:`~bridge_client.port.BridgeClient`
-poll loop (which is kept only as a tracer-bullet double). The native construct
-gives us the two long-running mechanisms for free:
+The demos consume the Bridge through ADK's platform-native ``RemoteA2aAgent``
+(the M0 hand-rolled ``BridgeClient`` poll loop was removed once the wire contract
+was validated — see the adr-0009 amendment). The native construct gives us the two
+long-running mechanisms for free:
 
 - **progress** — a streamed ``TaskStatusUpdateEvent`` with a non-empty
   ``status.message`` surfaces as a thought event;

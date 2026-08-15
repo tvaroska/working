@@ -1,13 +1,15 @@
-"""The address-verification ``LlmAgent`` factory and its Bridge-port tool wiring.
+"""The address-verification ``LlmAgent`` and its native Bridge sub-agent wiring.
 
-This is the agent half of the M0 contract tracer bullet: a real ``google-adk``
-``LlmAgent`` (day-one platform bet — ADR-0001) that, on one turn, requests the
-``address-proof`` document for party ``jordan-lee`` through the injected
-``BridgeClient`` port and renders the returned ``id`` + structured info.
+The address agent is a real ``google-adk`` ``LlmAgent`` (day-one platform bet —
+ADR-0001) that consumes the Document Bridge through ADK's platform-native
+``RemoteA2aAgent`` (adr-0009) wired as a **sub-agent**. On a turn the model
+delegates to the ``document_bridge`` sub-agent (via ADK's injected
+``transfer_to_agent``); the Bridge collects the ``address-proof`` document for the
+party and relays the resulting ``ExchangeTurn`` back as the turn output.
 
-The party and skill are hard-coded (no skills registry in M0). The agent depends
-only on the ``BridgeClient`` port; the factory injects a concrete client and the
-tool closes over it, so the Sprint-1 mock->real swap is a no-op for the agent.
+The party and skill are hard-coded (no skills registry in M0). The Bridge is
+configured only by its **Agent Card URL** — the single mock->real / local->GCP
+swap point, a no-op for the agent code.
 """
 
 import os
@@ -15,68 +17,78 @@ import os
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
 from google.adk.runners import InMemoryRunner
-from google.adk.tools import FunctionTool
 from google.genai import types
 
-from bridge_client import BridgeClient, BridgeClientError
-from contract import CollectRequest
-
-from .render import collection_to_dict
+from bridge_client import build_bridge_remote_agent
 
 PARTY = "jordan-lee"
 SKILL = "address-proof"
-DEFAULT_MODEL = os.environ.get("ADDRESS_AGENT_MODEL", "gemini-2.0-flash")
+DEFAULT_MODEL = os.environ.get("ADDRESS_AGENT_MODEL", "gemini-3.7-flash")
+BRIDGE_SUBAGENT_NAME = "document_bridge"
 
 INSTRUCTION = (
-    "You are an address-verification agent. Call the `collect_address_proof` tool "
-    "exactly once to request the address-proof document for the party, then present "
-    "the returned document id and its structured fields."
+    "You are an address-verification agent. To collect the address-proof document "
+    f"for party {PARTY}, delegate to the `{BRIDGE_SUBAGENT_NAME}` sub-agent by "
+    "transferring to it. When it returns the collected document, present the "
+    "document id and its structured fields."
 )
 
 APP_NAME = "address"
 
 
+def _default_card_url() -> str:
+    """Resolve the Bridge Agent Card URL from the environment.
+
+    ``BRIDGE_CARD_URL`` wins; otherwise it is derived from ``BRIDGE_BASE_URL``
+    (default ``http://127.0.0.1:8080``) + the well-known agent-card path.
+    """
+    explicit = os.environ.get("BRIDGE_CARD_URL")
+    if explicit:
+        return explicit
+    base = os.environ.get("BRIDGE_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
+    return f"{base}/.well-known/agent-card.json"
+
+
 def build_address_agent(
-    bridge_client: BridgeClient,
+    bridge_card_url: str | None = None,
     *,
     model: str | BaseLlm = DEFAULT_MODEL,
 ) -> LlmAgent:
-    """Build the address-verification ``LlmAgent`` wired to a ``BridgeClient``.
+    """Build the address-verification ``LlmAgent`` with the Bridge as a sub-agent.
 
     Args:
-        bridge_client: The port the tool calls to reach the Bridge. Injected so
-            the concrete adapter (mock now, real Bridge in Sprint 1) can be
-            swapped with no agent-code change.
+        bridge_card_url: URL of the Bridge's Agent Card. This is the single swap
+            point between mock/real and local/GCP; defaults to the environment
+            (``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``).
         model: A model id ``str`` (prod, via ``ADDRESS_AGENT_MODEL``) or a
             ``BaseLlm`` instance (tests inject a scripted stub for a hermetic run).
 
     Returns:
-        A real ``google-adk`` ``LlmAgent`` with exactly one ``FunctionTool``
-        (``collect_address_proof``) closing over ``bridge_client``.
+        A real ``google-adk`` ``LlmAgent`` whose sole sub-agent is a
+        ``RemoteA2aAgent`` (``document_bridge``) consuming the Bridge over A2A.
     """
-
-    async def collect_address_proof() -> dict:
-        """Request the address-proof document for the party.
-
-        Returns the collected document id and structured fields.
-        """
-        request = CollectRequest(party=PARTY, skill=SKILL)
-        try:
-            turn = await bridge_client.collect(request)
-        except BridgeClientError as exc:
-            return {"error": str(exc)}
-        return collection_to_dict(turn)
-
-    tool = FunctionTool(collect_address_proof)
+    card_url = bridge_card_url or _default_card_url()
+    bridge = build_bridge_remote_agent(card_url, name=BRIDGE_SUBAGENT_NAME)
 
     return LlmAgent(
         name="address_agent",
         description="Address verification agent (M0 tracer bullet).",
         model=model,
         instruction=INSTRUCTION,
-        tools=[tool],
+        sub_agents=[bridge],
         output_key="address_result",
     )
+
+
+root_agent = build_address_agent()
+"""Module-level agent for the ADK dev UI (``adk web``) and ADK deploy tooling.
+
+ADK's agent loader discovers a package by importing it and reading a module-level
+``root_agent``. Building it here is side-effect-free — ``RemoteA2aAgent`` only
+stores the card URL (resolved from ``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``); no
+network call happens until a turn runs. Vertex AI credentials/region come from the
+agent's ``.env`` (loaded by ``adk web``) or the ambient environment.
+"""
 
 
 async def run_once(

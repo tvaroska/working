@@ -1,9 +1,14 @@
 """Pure, network-free rendering of a collected ``ExchangeTurn``.
 
-The agent's tool result and human-readable summary are produced by these
-deterministic functions — never by free-form LLM text. M0.6 asserts against this
-output (substrings like the document ``id`` and key-field values), so the shape
-must stay stable across runs (no timestamps; dict order rides insertion order).
+Deterministic ``ExchangeTurn`` -> dict / summary helpers — never free-form LLM
+text. Output shape must stay stable across runs (no timestamps; dict order rides
+insertion order).
+
+These are **not** wired into the address turn any more: since adr-0009 the Bridge
+sub-agent (``RemoteA2aAgent``) relays its own ``ExchangeTurn`` payload directly.
+They are retained for the Sprint-1 ``is_satisfied`` gate, which will post-process
+the collected ledger once control returns to the address agent, and are covered by
+their own unit tests.
 """
 
 from contract import ExchangeTurn, LedgerEntry
