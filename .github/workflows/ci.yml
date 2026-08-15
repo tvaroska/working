@@ -1,0 +1,119 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      agents:   ${{ steps.filter.outputs.agents }}
+      core:     ${{ steps.filter.outputs.core }}
+      skills:   ${{ steps.filter.outputs.skills }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871   # v4.2.1
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            agents:
+              - 'agents/**'
+              - '.github/workflows/ci.yml'
+            core:
+              - 'bridge/**'
+              - '.github/workflows/ci.yml'
+            skills:
+              - 'skills/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
+  agents:
+    needs: changes
+    if: needs.changes.outputs.agents == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agents
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871   # v4.2.1
+      - uses: astral-sh/setup-uv@0d1b58c5f02339bd2e8b5c16ba38a44ed8672d95   # v6.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: 'agents/uv.lock'
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - name: SDK pin drift guard (test_scaffold.py)
+        run: uv run pytest tests/test_scaffold.py
+      - run: uv run pytest
+
+  core:
+    needs: changes
+    if: needs.changes.outputs.core == 'true' && hashFiles('bridge/pyproject.toml') != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bridge
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871   # v4.2.1
+      - uses: astral-sh/setup-uv@0d1b58c5f02339bd2e8b5c16ba38a44ed8672d95   # v6.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: 'bridge/uv.lock'
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run pytest    # includes tests/test_no_agents_import.py (isolation guard)
+
+  skills:
+    needs: changes
+    if: needs.changes.outputs.skills == 'true' && hashFiles('skills/**/SKILL.md') != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871   # v4.2.1
+      # TODO(S0.6): install skills-ref (package/version unresolved in repo docs) and run:
+      #   for d in skills/*/; do skills-ref validate "$d" || exit 1; done
+      - run: echo "skills job placeholder — wired for real in S0.6"
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' && hashFiles('frontend/package.json') != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871   # v4.2.1
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2      # v4.0.0
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6     # v4.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  ci-success:
+    if: always()
+    needs: [changes, agents, core, skills, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no job failed
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "job results: $results"
+          for r in $results; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "A required job did not succeed."; exit 1
+            fi
+          done
+          echo "All jobs passed or were skipped."

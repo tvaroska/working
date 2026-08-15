@@ -33,11 +33,11 @@
 
 **Already done (M0.1, do not redo):** `agents/` uv project, `src/` layout (`contract` + `agents`), pinned `google-adk>=2.7.0,<3` / `a2a-sdk[http-server]` / `pydantic>=2`, `uv.lock` committed, pytest + ruff wired, `test_scaffold.py` pin-guard. Sprint 0 extends this to the **whole repo** (core, frontend, skills, IaC, CI).
 
-- [ ] **S0.1 — CI pipeline (GitHub Actions).** One workflow, path-filtered per project, green as the merge gate.
+- [x] **S0.1 — CI pipeline (GitHub Actions).** One workflow, path-filtered per project, green as the merge gate.
   1. `.github/workflows/ci.yml` — jobs: **agents** (`uv sync` → `uv run ruff check` → `uv run pytest`, cwd `agents/`), **core** (same, cwd `bridge/` once S0.2 lands), **skills** (`skills-ref validate` per skill folder — S0.6), **frontend** (`pnpm install` → lint → `pnpm test` — S0.4, allowed to no-op until the app exists).
   2. Pin `astral-sh/setup-uv` with cache keyed on `uv.lock`; pin Python 3.12 via `.python-version`.
   3. Path filters so a docs-only PR skips code jobs; `bridge/`-vs-`agents/` isolation guard test (S0.2) runs in the core job.
-  4. Add a **SDK-pin drift** guard: `test_scaffold.py` already asserts the `google-adk` range — surface its failure clearly (ADR-0001 SDK risk).
+  4. Add a **SDK-pin drift** guard: `test_scaffold.py` already asserts the `google-adk` range — surface its failure clearly (ADR-0001 SDK risk). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.1-ci-pipeline.md)_
 
 - [ ] **S0.2 — `bridge/` core project scaffold.** The reusable core as a **separate** uv project (the showcase artifact; "the difference between demos is the agent, not the Bridge").
   1. `bridge/pyproject.toml` (src layout, own `uv.lock`), same pins as `agents/`; `bridge/src/bridge/__init__.py` placeholder + `bridge/tests/`.
