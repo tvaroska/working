@@ -18,7 +18,7 @@ agents/
     bridge_client/     Native RemoteA2aAgent Bridge consumer (build_bridge_remote_agent) + pure A2A wire helpers (adr-0009)
     agents/
       mock_bridge/     a2a-sdk mock server (permanent Sprint-1 contract double)
-      address/         Address LlmAgent (Bridge as RemoteA2aAgent sub-agent) + manual driver
+      address/         Address LlmAgent (Bridge as a BridgeAgentTool call-and-return) + manual driver
   tests/               Pytest suite; test_round_trip.py is the M0 validation gate
 ```
 
@@ -33,7 +33,7 @@ uv run pytest
 - It drives the agent with a scripted model stub (`ScriptedTransferModel`), not a real model.
 - It does **not** need a running server, API credentials, or any environment setup.
 
-The round-trip test (`test_round_trip_agent_bridge_agent`) proves the agent delegates to its `document_bridge` sub-agent (a native `RemoteA2aAgent`), which collects from the live mock over canonical A2A, and the eval-sourced `ExchangeTurn` (matching `wiki/evals/address/expected.json`) is relayed back into the agent's event stream. The `message/send` → `Task{WORKING}` → `tasks/get` → `COMPLETED` wire ordering is locked separately by `test_native_consumer.py` Test A.
+The round-trip test (`test_round_trip_agent_bridge_agent`) proves the agent calls its `document_bridge` tool (a `BridgeAgentTool` over a native `RemoteA2aAgent`), which collects from the live mock over canonical A2A, and the eval-sourced `ExchangeTurn` (matching `wiki/evals/address/expected.json`) comes back as the tool result. The `message/send` → `Task{WORKING}` → `tasks/get` → `COMPLETED` wire ordering is locked separately by `test_native_consumer.py` Test A.
 
 ## Start the mock
 
@@ -105,9 +105,9 @@ The agent prints the rendered document id (`gov-id-clean`) and its structured fi
 
 ## Native A2A consumer (adr-0009)
 
-The demos consume the Bridge through ADK's platform-native `RemoteA2aAgent`. `bridge_client.build_bridge_remote_agent(agent_card_url)` returns a card-configured consumer, wired into the address agent as a **sub-agent** (`document_bridge`); the mock→real / local→GCP swap is a **different Agent Card URL**, not different agent code. The native construct gives progress (`TaskStatusUpdateEvent.status.message`) and **park/resume** (`INPUT_REQUIRED` → `LongRunningFunctionTool` pause → `FunctionResponse` resume) for free. The M0 hand-rolled `BridgeClient` port + poll loop was removed once the wire contract was validated (see the adr-0009 amendment).
+The demos consume the Bridge through ADK's platform-native `RemoteA2aAgent`. `bridge_client.build_bridge_remote_agent(agent_card_url, collect_request=...)` returns a card-configured consumer, wired into the address agent as a **`BridgeAgentTool`** (`document_bridge`, call-and-return) so control returns with the collected `ExchangeTurn` as the tool result (S1-2); the structured `CollectRequest` is injected on the send path by a `RequestInterceptor`. The mock→real / local→GCP swap is a **different Agent Card URL**, not different agent code. The native construct gives progress (`TaskStatusUpdateEvent.status.message`) and **park/resume** (`INPUT_REQUIRED` → `LongRunningFunctionTool` pause → `FunctionResponse` resume) for free. The M0 hand-rolled `BridgeClient` port + poll loop was removed once the wire contract was validated (see the adr-0009 amendment).
 
-`tests/test_native_consumer.py` covers the wire contract (raw client, Test A) and the `RemoteA2aAgent` pause/resume spike (Test B); `tests/test_round_trip.py` covers the address agent's transfer → sub-agent → mock path end to end. `RemoteA2aAgent` is `@a2a_experimental` (ADK 2.7.0) — pinned via `use_legacy=True` until validated.
+`tests/test_native_consumer.py` covers the wire contract (raw client, Test A) and the `RemoteA2aAgent` pause/resume spike (Test B); `tests/test_round_trip.py` covers the address agent's tool → mock path end to end; `tests/test_control_return.py` locks the send-path `CollectRequest` DataPart (interceptor unit tests + live capture) and control return (S1-2). `RemoteA2aAgent` is `@a2a_experimental` (ADK 2.7.0) — pinned via `use_legacy=True` until validated.
 
 ## Lint
 

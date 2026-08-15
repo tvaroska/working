@@ -19,10 +19,15 @@ Notes on the installed ``a2a-sdk`` (1.1.x): types are protobuf messages (build
 with kwargs, read with ``.field`` / ``.HasField``; never ``.model_dump()``).
 """
 
+import json
+
 from a2a.helpers.proto_helpers import get_data_parts, new_data_message
 from a2a.types import Message, Role, Task
 
 from contract import CollectRequest, ExchangeTurn
+
+_A2A_START = b"<a2a_datapart_json>"
+_A2A_END = b"</a2a_datapart_json>"
 
 
 class BridgeWireError(Exception):
@@ -57,3 +62,35 @@ def task_to_exchange_turn(task: Task) -> ExchangeTurn:
     if not turn.context_id:
         turn = turn.model_copy(update={"context_id": task.context_id})
     return turn
+
+
+def extract_exchange_turn(events) -> dict | None:
+    """Scan an ADK event stream for the Bridge's ``ExchangeTurn`` DataPart.
+
+    A generic A2A data part arrives from ``RemoteA2aAgent`` as an ``inline_data``
+    blob wrapped in ADK's ``<a2a_datapart_json>…</a2a_datapart_json>`` tags (see
+    ``convert_a2a_part_to_genai_part``). This unwraps and JSON-parses the embedded
+    ``ExchangeTurn``, returning the first dict whose ``status.ledger`` is non-empty
+    (the completed collection) or ``None`` if none is present.
+
+    ``AgentTool`` surfaces only the *last* event's text content, dropping
+    ``inline_data`` parts entirely — so the tool must scan **all** events here to
+    recover the structured payload (S1-2 control-return).
+    """
+    for event in events:
+        if not (event.content and event.content.parts):
+            continue
+        for part in event.content.parts:
+            blob = getattr(part, "inline_data", None)
+            if blob is None or not blob.data:
+                continue
+            raw = blob.data
+            if _A2A_START in raw and _A2A_END in raw:
+                raw = raw.split(_A2A_START, 1)[1].split(_A2A_END, 1)[0]
+            try:
+                data = json.loads(raw)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(data, dict) and data.get("status", {}).get("ledger"):
+                return data
+    return None

@@ -41,6 +41,8 @@ The M0 tracer bullet uses **transfer** (`sub_agents`): thinnest one-shot delegat
 
 A second consequence of transfer: it forwards **conversation content**, not a structured `CollectRequest` DataPart — so the typed outbound request leaves the send path under M0's transfer wiring. Restoring it (carrying `CollectRequest` as a JSON part) rides along with the `AgentTool` switch.
 
+**Landed (2026-08-15, S1-2):** the address agent now wires the Bridge as a `BridgeAgentTool` (an `AgentTool` over the same `RemoteA2aAgent`), so control returns with the `ExchangeTurn` as the tool result. The `CollectRequest` DataPart is restored on the send path by a `RequestInterceptor` (guarded on `task_id` so it rewrites only the fresh send). The multi-turn Collect loop with one durable task/context across rounds remains (S1-4).
+
 ## Two mechanisms for long-running work
 
 A collection runs for [[bridge-long-running|days or weeks]]. `RemoteA2aAgent` supports that through two standard mechanisms, and the **Bridge's task status is what selects which one the caller gets**:
@@ -76,8 +78,9 @@ The [[bridge-collect|Collect]] tracer bullet (M0) originally consumed the Bridge
 
 - **Decided (`adr-0009`):** `RemoteA2aAgent` is the canonical consumer; waits are `input-required` (native pause), progress is `TaskStatusUpdateEvent.status.message`, integration-extension mode pinned (`use_legacy=True` until validated).
 - **Committed / already in the edge:** `_status_for` maps a pending collection → `INPUT_REQUIRED` ([[bridge-a2a-edge]]); native HITL pause/resume ([[bridge-adk]]).
-- **Landed (2026-08-15):** the address agent consumes the Bridge as a native `RemoteA2aAgent` **sub-agent** (transfer); the M0 `BridgeClient` port was removed (adr-0009 amendment). Mock park (`INPUT_REQUIRED`) + non-empty `status.message` progress are covered by the seam suite.
-- **Sprint 1 (remaining):** switch the wiring from transfer to **`AgentTool`** so control returns for the **`is_satisfied`** gate; restore the structured `CollectRequest` on the send path; grow the multi-turn Collect loop. See `PLAN.md`.
+- **Landed (2026-08-15):** the address agent consumes the Bridge as a native `RemoteA2aAgent` (S1-2: wired as a **`BridgeAgentTool`** call-and-return; initially a transfer sub-agent); the M0 `BridgeClient` port was removed (adr-0009 amendment). Mock park (`INPUT_REQUIRED`) + non-empty `status.message` progress are covered by the seam suite.
+- **Landed (2026-08-15, S1-2):** the wiring switched from transfer to a **`BridgeAgentTool`** (`AgentTool` over `RemoteA2aAgent`) so control returns with the `ExchangeTurn`; the structured `CollectRequest` is restored on the send path via a `task_id`-guarded `RequestInterceptor`. Covered by the seam suite.
+- **Sprint 1 (remaining):** wire the **`is_satisfied`** gate (S1-3) and grow the multi-turn Collect loop with one durable task/context across rounds (S1-4). See `PLAN.md`.
 - **Risk:** `RemoteA2aAgent` is `@a2a_experimental` in `google-adk` 2.7.0 — pin and cover in the shared seam suite (`docs/decisions/adr-0001-stack.md`).
 
 ## Related

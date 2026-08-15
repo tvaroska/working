@@ -1,11 +1,17 @@
-"""The address-verification ``LlmAgent`` and its native Bridge sub-agent wiring.
+"""The address-verification ``LlmAgent`` and its native Bridge tool wiring.
 
 The address agent is a real ``google-adk`` ``LlmAgent`` (day-one platform bet —
 ADR-0001) that consumes the Document Bridge through ADK's platform-native
-``RemoteA2aAgent`` (adr-0009) wired as a **sub-agent**. On a turn the model
-delegates to the ``document_bridge`` sub-agent (via ADK's injected
-``transfer_to_agent``); the Bridge collects the ``address-proof`` document for the
-party and relays the resulting ``ExchangeTurn`` back as the turn output.
+``RemoteA2aAgent`` (adr-0009), wired as an **``AgentTool``** (call-and-return) so
+control **returns** to the address agent with the collected ``ExchangeTurn`` (S1-2).
+On a turn the model calls the ``document_bridge`` tool; the Bridge collects the
+``address-proof`` document for the party and the structured ``ExchangeTurn`` comes
+back as the tool result for the agent to post-process (the ``is_satisfied`` gate in
+S1-3, the Collect loop in S1-4).
+
+The structured ``CollectRequest`` (``{party, skill}``) is injected on the send path
+by a request interceptor baked into the consumer (S1-2), independent of the model's
+conversation content.
 
 The party and skill are hard-coded (no skills registry in M0). The Bridge is
 configured only by its **Agent Card URL** — the single mock->real / local->GCP
@@ -19,18 +25,18 @@ from google.adk.models import BaseLlm
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
-from bridge_client import build_bridge_remote_agent
+from bridge_client import BridgeAgentTool, build_bridge_remote_agent
+from contract import CollectRequest
 
 PARTY = "jordan-lee"
 SKILL = "address-proof"
 DEFAULT_MODEL = os.environ.get("ADDRESS_AGENT_MODEL", "gemini-3.7-flash")
-BRIDGE_SUBAGENT_NAME = "document_bridge"
+BRIDGE_TOOL_NAME = "document_bridge"
 
 INSTRUCTION = (
     "You are an address-verification agent. To collect the address-proof document "
-    f"for party {PARTY}, delegate to the `{BRIDGE_SUBAGENT_NAME}` sub-agent by "
-    "transferring to it. When it returns the collected document, present the "
-    "document id and its structured fields."
+    f"for party {PARTY}, call the `{BRIDGE_TOOL_NAME}` tool. When it returns the "
+    "collected `ExchangeTurn`, present the document id and its structured fields."
 )
 
 APP_NAME = "address"
@@ -54,7 +60,7 @@ def build_address_agent(
     *,
     model: str | BaseLlm = DEFAULT_MODEL,
 ) -> LlmAgent:
-    """Build the address-verification ``LlmAgent`` with the Bridge as a sub-agent.
+    """Build the address-verification ``LlmAgent`` with the Bridge as a tool.
 
     Args:
         bridge_card_url: URL of the Bridge's Agent Card. This is the single swap
@@ -64,18 +70,23 @@ def build_address_agent(
             ``BaseLlm`` instance (tests inject a scripted stub for a hermetic run).
 
     Returns:
-        A real ``google-adk`` ``LlmAgent`` whose sole sub-agent is a
-        ``RemoteA2aAgent`` (``document_bridge``) consuming the Bridge over A2A.
+        A real ``google-adk`` ``LlmAgent`` whose sole tool is a
+        ``BridgeAgentTool`` wrapping a ``RemoteA2aAgent`` (``document_bridge``)
+        consuming the Bridge over A2A (call-and-return).
     """
     card_url = bridge_card_url or _default_card_url()
-    bridge = build_bridge_remote_agent(card_url, name=BRIDGE_SUBAGENT_NAME)
+    bridge = build_bridge_remote_agent(
+        card_url,
+        name=BRIDGE_TOOL_NAME,
+        collect_request=CollectRequest(party=PARTY, skill=SKILL),
+    )
 
     return LlmAgent(
         name="address_agent",
         description="Address verification agent (M0 tracer bullet).",
         model=model,
         instruction=INSTRUCTION,
-        sub_agents=[bridge],
+        tools=[BridgeAgentTool(bridge)],
         output_key="address_result",
     )
 

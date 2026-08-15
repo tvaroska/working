@@ -111,4 +111,7 @@ def create_app(
         await handler.aclose()
 
     app = Starlette(routes=routes, lifespan=lifespan)
+    # Expose the executor so the seam suite can inspect captured requests
+    # (e.g. the structured CollectRequest that arrived on message/send — S1-2).
+    app.state.mock_executor = executor
     return app

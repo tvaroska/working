@@ -14,7 +14,7 @@ pause.
 
 import asyncio
 
-from a2a.helpers.proto_helpers import new_data_part, new_text_message
+from a2a.helpers.proto_helpers import get_data_parts, new_data_part, new_text_message
 from a2a.server.agent_execution import AgentExecutor
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Task, TaskState, TaskStatus
@@ -54,6 +54,12 @@ class MockBridgeExecutor(AgentExecutor):
         self._ledger_entry = ledger_entry
         self._hold_seconds = hold_seconds
         self._park = park
+        self.last_request_data: dict | None = None
+        """Data part of the most recent first-turn inbound message.
+
+        Lets the seam suite assert the outbound ``CollectRequest`` arrived as a
+        structured JSON DataPart (S1-2), not free conversation text.
+        """
 
     async def execute(self, context, event_queue):
         """Execute the mock collect.
@@ -77,6 +83,14 @@ class MockBridgeExecutor(AgentExecutor):
         ):
             await self._complete(context, event_queue, resume=True)
             return
+
+        # Capture the first-turn inbound request's data part so the seam suite
+        # can assert a structured CollectRequest arrived (not free text).
+        message = getattr(context, "message", None)
+        if message is not None:
+            datas = get_data_parts(message.parts)
+            if datas:
+                self.last_request_data = datas[0]
 
         # First turn. Enqueue a Task object (required by a2a-sdk for async
         # workflows) BEFORE any TaskStatusUpdateEvents.

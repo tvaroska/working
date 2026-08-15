@@ -9,16 +9,24 @@ This package imports only ``contract`` + stdlib + ``a2a-sdk`` + ``httpx`` +
 ``google-adk`` and must never import anything under ``agents.*``.
 """
 
-from .remote_consumer import build_bridge_remote_agent
+from .bridge_tool import BridgeAgentTool
+from .remote_consumer import (
+    build_bridge_remote_agent,
+    build_collect_request_interceptor,
+)
 from .wire import (
     BridgeWireError,
+    extract_exchange_turn,
     request_to_message,
     task_to_exchange_turn,
 )
 
 __all__ = [
+    "BridgeAgentTool",
     "build_bridge_remote_agent",
+    "build_collect_request_interceptor",
     "BridgeWireError",
+    "extract_exchange_turn",
     "request_to_message",
     "task_to_exchange_turn",
 ]

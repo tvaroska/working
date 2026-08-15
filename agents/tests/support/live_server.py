@@ -41,9 +41,11 @@ class LiveMockServer:
         self.card_url = f"{self.base_url}/.well-known/agent-card.json"
         self.server: uvicorn.Server | None = None
         self.thread: threading.Thread | None = None
+        self.executor = None
 
     def __enter__(self) -> "LiveMockServer":
         app = create_app(self.base_url, hold_seconds=self.hold_seconds, park=self.park)
+        self.executor = app.state.mock_executor
         config = uvicorn.Config(
             app,
             host="127.0.0.1",
