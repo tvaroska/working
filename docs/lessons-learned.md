@@ -106,6 +106,57 @@ A2A client + poll loop. Two traps ride on this:
   `Message` that ADK collapses to `None` — so a status update with no parts vanishes **with no error**.
   Mock and real Bridge must attach a **non-empty** message; the seam suite must assert it round-trips.
 
+### A12. The durable consumer is a `Workflow` graph — and `AgentTool`'s *fresh session* is why
+The consumer-wiring trajectory (`adr-0010`) turns on one source-verified fact: **`AgentTool` gets
+control-return right but runs the wrapped `RemoteA2aAgent` in a fresh throwaway child session** (new
+`Runner` + `InMemorySessionService` per call). That single fact — not control-return — is the root of
+every current workaround: the hand-threaded exchange `context_id` (state is the only channel that
+survives an `AgentTool` call), the `skip_summarization=False` loop dependency, the copied Runner
+boilerplate — and it **structurally blocks native park/resume** (no durable session for a
+`LongRunningFunctionTool` pause to resume against). Carry these into the build:
+- **Two distinct "returns" — don't conflate them.** (a) Bridge→consumer **data** return (the
+  `ExchangeTurn`/documents) happens in *every* wiring; (b) consumer→root **reasoning-control** return
+  (a post-Bridge step to run the gate) happens only under `AgentTool` or a graph — **never** under a
+  `transfer` sub-agent (a `RemoteA2aAgent` issues no transfer-back; it has no LLM). "Control returns"
+  is ambiguous until you say *which*.
+- **The durable target is `google.adk.workflow.Workflow`, not `LoopAgent`.** `LoopAgent`/
+  `SequentialAgent` are `@deprecated` **in favor of `Workflow`** in `google-adk` 2.7.0 — building the
+  durable path on the deprecated construct is day-one debt. `LoopAgent` is verified to do what we need
+  (shared session, `escalate` termination, pause propagation) and is a **known-good fallback** only.
+- **`Workflow` cannot yet be an `LlmAgent` sub-agent** (2.7.0). So the graph sits **on top** with the
+  LLM as a *node* (a presenter), never behind an LLM "front". This shapes every service agent.
+- **The general service-agent shape** (`adr-0010`, `wiki/bridge-a2a-consumer.md`): a `Workflow` whose
+  nodes are a `RemoteA2aAgent` **collect** node → a **deterministic Sense-B gate** node (`is_satisfied`
+  for Address; the emergent-requirements decision for RFP) → an `LlmAgent` **presenter** node, on one
+  shared durable session. Only the nodes and the gate vary per demo; the graph kind does not.
+- **Migration is `AgentTool` → `Workflow`, never → `transfer`/`LoopAgent`.** Two S1-6 spike gates
+  precede the commit: (1) a `RemoteA2aAgent` (non-`LlmAgent`) usable as a `Workflow` node; (2)
+  `input-required` pause propagating/resuming *inside* a `Workflow` (verified inside `LoopAgent`).
+
+### A13. Durable state restore is mostly platform-DEFAULT — the webhook is a doorbell, not a restore
+For a weeks-scale park (A11 / `adr-0009` §2) to pay off, the consumer must return to the **same state**
+after its process died and restarted. Source audit of installed `google-adk` 2.7.0 + `a2a-sdk`
+establishes that restore is **mostly already in the platform** — the custom surface is small and
+well-bounded. Keep *restore* and *wake* separable (`adr-0010`):
+- **DEFAULT (config swap, no custom code):** `DatabaseSessionService`/`VertexAiSessionService`
+  (session state + full event history, reloadable by `(app, user, session_id)`); `DatabaseTaskStore`
+  (task status + artifacts + `context_id` survive restart); `tasks/get`/`tasks/resubscribe` re-attach;
+  the peer `task_id`/`context_id` ride `event.custom_metadata` and are auto-repopulated on the resume
+  send; the Runner **auto-matches** a `FunctionResponse` back to the paused `function_call_id` and
+  rebuilds the invocation from persisted events; push-notification **sender** on the Bridge.
+- **EXPERIMENTAL:** `ResumabilityConfig(is_resumable=True)` — the switch that makes a park survive a
+  restart (`@experimental`, 2.7.0; see C5).
+- **CUSTOM (small, mechanical — Phase 3):** a **webhook receiver** (a2a-sdk is sender-only; neither
+  SDK ships a receiver; `adk web` can't host one) and a **`task_id`→session index** (no schema indexes
+  a session by A2A `context_id`/`task_id`). The receiver then builds the `FunctionResponse` and calls
+  `runner.run_async(...)` — everything downstream is DEFAULT. **The webhook delivers only "task X
+  changed"; it neither carries the caller's state nor puts the agent back where it paused.**
+
+Consequence for sequencing: durable park/resume across a restart needs only the DEFAULT stores + the
+EXPERIMENTAL switch and is testable with **no HTTP** (resume via `runner.run_async` manually) — that is
+S1-6. The webhook (Phase 3) adds only the two CUSTOM pieces, and only for legs that must outlive the
+process.
+
 ### A10. Keep the "why" next to the invariant
 The load-bearing invariants above (A1–A9) are exactly the ones that were previously scattered across
 code comments and planning notes rather than the spec — the class of knowledge that silently rots

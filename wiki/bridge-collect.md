@@ -5,6 +5,7 @@ related:
   - "[[bridge-aggregate-model]]"
   - "[[bridge-disposition]]"
   - "[[bridge-long-running]]"
+  - "[[bridge-collect-scenarios]]"
 tags: [bridge]
 status: review
 updated: 2026-08-05
@@ -25,7 +26,7 @@ Bridge: chase the outstanding items ─┐
         ▲────────────────────────────┘  repeat until the app says done
 ```
 
-**The loop is idle-driven over long horizons.** A real casefile fills over days or **weeks**, so the loop is not a process that stays running — the continuation lives in the durable exchange, and each turn is triggered by a party arrival, a [[bridge-proactive|clock alarm]], or an HITL resume. Because the per-turn reply (`next_requirements`) is a pure function of `(status, ledger)`, neither side needs to *sit* in the loop between turns. See [[bridge-long-running|long-running collection]]. On the calling side the loop runs as a [[bridge-a2a-consumer|native `RemoteA2aAgent` consumer]] that pauses on `INPUT_REQUIRED` between turns rather than blocking (`adr-0009`). 📋 The Address loop is now wired agent-side (`document_bridge` collect → authoritative `check_completeness` gate → chase if not done), with one durable exchange **`context_id`** threaded across rounds via session state (`adr-0009` S1-4 amendment).
+**The loop is idle-driven over long horizons.** A real casefile fills over days or **weeks**, so the loop is not a process that stays running — the continuation lives in the durable exchange, and each turn is triggered by a party arrival, a [[bridge-proactive|clock alarm]], or an HITL resume. Because the per-turn reply (`next_requirements`) is a pure function of `(status, ledger)`, neither side needs to *sit* in the loop between turns. See [[bridge-long-running|long-running collection]]. On the calling side the loop runs as a [[bridge-a2a-consumer|native `RemoteA2aAgent` consumer]] that pauses on `INPUT_REQUIRED` between turns rather than blocking (`adr-0009`). 📋 The Address loop is now wired agent-side (`document_bridge` collect → authoritative `check_completeness` gate → chase if not done), with one durable exchange **`context_id`** threaded across rounds via session state (`adr-0010`, `AgentTool` interim).
 
 **The Requirements payload is a list, not a language.** Each turn the agent returns a flat, fixed-schema to-do list — **data, not rules**:
 

@@ -5,6 +5,7 @@ related:
   - "[[bridge-adk]]"
   - "[[bridge-long-running]]"
   - "[[bridge-collect]]"
+  - "[[bridge-collect-scenarios]]"
 tags: [bridge]
 status: draft
 updated: 2026-08-15
@@ -12,7 +13,7 @@ updated: 2026-08-15
 
 # A2A Consumer (calling the Bridge)
 
-> The other side of the [[bridge-a2a-edge|A2A edge]]: how a servicer's (or processing) agent **consumes** the Bridge over canonical A2A. The principle is the same as everywhere else — **prefer the platform-native construct** ([[bridge-adk]]). For an ADK agent that calls another A2A agent, that construct is **`RemoteA2aAgent`**, not a hand-rolled A2A client. Decision: `docs/decisions/adr-0009-native-a2a-consumer.md`.
+> The other side of the [[bridge-a2a-edge|A2A edge]]: how a servicer's (or processing) agent **consumes** the Bridge over canonical A2A. The principle is the same as everywhere else — **prefer the platform-native construct** ([[bridge-adk]]). For an ADK agent that calls another A2A agent, that construct is **`RemoteA2aAgent`**, not a hand-rolled A2A client. Decisions: `adr-0009` (native consumer + wire vocabulary) and `adr-0010` (durable construct/wiring + state restore).
 
 > **This is not the deferred outbound client.** "Bridge-as-client" (the Bridge *dialing out* to counterparties, Agent-Card discovery — Phase 4, [[bridge-a2a-edge]]) is a different direction. Here it is *our* agent calling the Bridge inbound — the pull spine the core is built around.
 
@@ -28,29 +29,50 @@ An agent consumes the Bridge by instantiating **`RemoteA2aAgent`** against the B
 
 The reusability thesis is unchanged — *the difference between demos is the agent, not the Bridge* ([[bridge|core vs demos]]). Each demo points a `RemoteA2aAgent` at the same unchanged Bridge card; the mock→real and local→GCP swaps are a **different card URL**, not different agent code.
 
-## Wiring into the caller: transfer vs. call-and-return
+## Service-agent architecture (the general shape)
 
-`RemoteA2aAgent` is *what* consumes the Bridge; **how it hangs off the caller** is a second, consequential choice, because it decides whether control comes **back**:
+`RemoteA2aAgent` is *what* consumes the Bridge; the **target shape of the whole agent** is the same for every service agent — Address, Benefits, RFP, and any internal agent that calls the Bridge (`adr-0010`). The reusability thesis cuts one level deeper: the difference between demos is the **nodes and the gate**, not the graph *kind*. Every service agent is:
 
-| Wiring | Semantics | Control after the Bridge returns |
-|---|---|---|
-| **`sub_agents` + `transfer_to_agent`** | the caller **hands over** control to the Bridge sub-agent; the Bridge's relayed `ExchangeTurn` becomes the turn output | **does not return** to the caller — the turn ends at the sub-agent (a `RemoteA2aAgent` issues no transfer-back) |
-| **`AgentTool`** | the caller **calls** the Bridge as a tool and **keeps** control; the `ExchangeTurn` comes back as the tool result | **returns** to the caller, which can post-process and loop |
+> a **`Workflow`** (native graph) whose nodes are **(1) a `RemoteA2aAgent` collect node** (calls the Bridge over canonical A2A), **(2) a deterministic gate node** (the agent's Sense-B "done" function — `is_satisfied` for Address; the mutating-requirements decision for RFP), branching back to collect or forward, and **(3) an `LlmAgent` presenter node** (routes/chases and renders the deliverable) — all on **one shared, durable session**.
 
-The M0 tracer bullet uses **transfer** (`sub_agents`): thinnest one-shot delegation, no post-processing. But the [[bridge-collect|Collect]] loop's completeness decision (**`is_satisfied` — the app owns "done"**, Sense B) has to run **in the caller, after the Bridge returns its ledger**, then chase the next proof or stop. That post-processing loop needs control to come back — so the completeness-gated flow adopts **`AgentTool`** (or a follow-up root turn); transfer alone can't host the gate. This is a deliberate Sprint-1 switch, not the M0 default. See `adr-0009` (amendment) and [[bridge-collect]].
+What varies per demo, and what doesn't:
 
-A second consequence of transfer: it forwards **conversation content**, not a structured `CollectRequest` DataPart — so the typed outbound request leaves the send path under M0's transfer wiring. Restoring it (carrying `CollectRequest` as a JSON part) rides along with the `AgentTool` switch.
+| Fixed across all service agents | Varies per demo |
+|---|---|
+| Graph kind: `Workflow` (LLM as a *node*, not a front) | The gate function (Address `is_satisfied` vs. RFP emergent policy) |
+| Collect node: `RemoteA2aAgent` against the Bridge card | The chase/route prose in the presenter node's instruction |
+| Sense-A/Sense-B split ([[bridge-collect]]): Bridge dispositions, the agent gate decides "done" | How much the skill pins up front (bounded Address → emergent RFP) |
+| One durable session; `context_id` reused natively; park/resume via `input-required` | The mock→real / local→GCP swap is *only* a different card URL |
 
-**Landed (2026-08-15, S1-2):** the address agent now wires the Bridge as a `BridgeAgentTool` (an `AgentTool` over the same `RemoteA2aAgent`), so control returns with the `ExchangeTurn` as the tool result. The `CollectRequest` DataPart is restored on the send path by a `RequestInterceptor` (guarded on `task_id` so it rewrites only the fresh send).
+Two invariants make this a *shape*, not a suggestion: the gate node is a **deterministic pure function** (a model may never mint "done" — Sense B, [[bridge-collect]]), and the graph sits **on top** of the LLM (the presenter is a node) because "`Workflow` cannot yet be used as an `LlmAgent` sub-agent" (`google-adk` 2.7.0).
 
-**Landed (2026-08-15, S1-4):** the multi-turn Collect loop is wired agent-side (`document_bridge` collect → authoritative `check_completeness` gate → chase if not done → terminate on satisfied). The durable unit across rounds is the exchange **`context_id`**, not a reused **`task_id`**: each `AgentTool` call runs in a fresh child session, so the `context_id` is threaded through **session state** (`BridgeAgentTool` writes it; the interceptor stamps it on the next send) — every round continues one exchange. In the `park=False` completing path each round legitimately opens a **new task under the same context** (a context groups tasks; re-sending to a *completed* task is invalid A2A); "one task reused across turns" applies to the parked `input-required` pause/resume timescale, whose cross-`AgentTool` durability is a later concern. See `adr-0009` (S1-4 amendment).
+## Wiring: why the graph, and not transfer or `AgentTool`
+
+`RemoteA2aAgent` is *what* consumes the Bridge; **how it hangs off the caller** is a second, consequential choice, because it decides whether **reasoning control** comes back to run the gate. The [[bridge-collect|Collect]] loop's completeness decision (**`is_satisfied` — the app owns "done"**, Sense B) has to run *in the caller, after the Bridge returns its ledger*, then chase the next proof or stop. Three wirings, in order of durability (verified against installed ADK 2.7.0):
+
+| Wiring | Control returns to run the gate? | Session across rounds | Native park/resume | Status |
+|---|---|---|---|---|
+| `sub_agents` + `transfer_to_agent` | **No** — one-way handoff; the sub-agent's output is the turn's final output (`transfer_to_agent` is a control-flow primitive, not a tool; a `RemoteA2aAgent` issues no transfer-back) | n/a | n/a | rejected for the loop |
+| **`AgentTool`** (today) | **Yes**, as a tool result | **fresh throwaway** per call | **impossible** | interim (M0/S1) |
+| **native graph** (`Workflow`) | **Yes** — the graph *is* the control flow; the gate is a node | **shared, durable** — sub-nodes get the parent `InvocationContext`; `RemoteA2aAgent` sees its own prior event and reuses the `context_id` natively | **works** — an `input-required` pause hits `ctx.should_pause_invocation`, the graph suspends and resumes from saved node state | **durable target (S1-6)** |
+
+**The root problem is the session, not control-return.** `AgentTool` gets control-return right but runs the Bridge in a **fresh throwaway child session** (new `Runner` + `InMemorySessionService` per call). That single fact forces every current workaround — `BridgeAgentTool`'s copied Runner boilerplate, the hand-threaded `context_id`, the `skip_summarization=False` loop dependency — and structurally blocks native park/resume (no durable session for a `LongRunningFunctionTool` pause to resume against). The fix is not a different call/return choice but a different **place for control to return to**: a graph whose nodes run on one shared, durable session.
+
+Two ADK facts fix the construct (`adr-0010`):
+
+- **`Workflow` (node/edge graph, `google.adk.workflow`) is the go-forward API and is *not* `@experimental`.** `LoopAgent`/`SequentialAgent` are now `@deprecated` **in favor of `Workflow`** (`loop_agent.py`), so the durable design targets `Workflow`, not `LoopAgent` — building new code on the deprecated construct would be day-one debt. (`LoopAgent` is verified to do exactly what we need and stands as a **known-good fallback**.)
+- **Two unknowns gate the migration** (S1-6 spike): (1) can a `RemoteA2aAgent` (a non-`LlmAgent` `BaseAgent`) be a `Workflow` **node** — only `@node` functions, `FunctionNode`, and *`LlmAgent`*-as-node are confirmed; (2) does an `input-required` pause propagate/resume cleanly **inside a `Workflow`** (verified inside `LoopAgent`, not yet inside `Workflow`). Also note the composition constraint: **"`Workflow` cannot yet be used as an `LlmAgent` sub-agent"** — so the graph sits **on top** (LLM as a *node*, e.g. a presenter), not behind an LLM "front".
+
+Only `ResumabilityConfig` (the persistent-checkpoint half) is `@experimental` — see [[#Durable state restore — what ships vs. what we build]]. Migration path is **`AgentTool` → `Workflow`**, never → transfer/`LoopAgent`; this is the concrete shape of **S1-6** in `PLAN.md`.
+
+**Current state (interim).** Until S1-6 lands, the address agent runs on the `AgentTool` wiring: the Bridge is a `BridgeAgentTool` (an `AgentTool` over `RemoteA2aAgent`), control returns with the `ExchangeTurn` as a tool result, the structured `CollectRequest` is restored on the send path by a `task_id`-guarded `RequestInterceptor`, and the multi-turn Collect loop threads one durable exchange `context_id` through session state (because each `AgentTool` call runs a fresh child session). Build history: `PLAN.md` (M0.x superseded; S1-2/S1-4 landed); rationale: `adr-0010`.
 
 ## Two mechanisms for long-running work
 
 A collection runs for [[bridge-long-running|days or weeks]]. `RemoteA2aAgent` supports that through two standard mechanisms, and the **Bridge's task status is what selects which one the caller gets**:
 
 1. **Hold and wait (seconds → minutes).** While connected, the caller consumes the task's update stream; `submitted`/`working` states surface as ADK *thought* events (progress), never the final answer. Bounded by the client timeout (ADK default 600s). Fine for the M0 ~10s hold; **cannot** span weeks.
-2. **Pause and resume (hours → weeks, zero compute).** When the Bridge parks awaiting an external event, its task returns **`input-required`** (or `auth-required` for a credential blocker). `RemoteA2aAgent` turns that into a **`LongRunningFunctionTool` pause**: the caller's invocation *ends* (zero compute), the peer `task_id` + `context_id` persist on the [[bridge-aggregate-model|session]], and a later `FunctionResponse` resumes to the *same* task. This is the **same** native durability the Bridge already uses for [[bridge-adk|HITL]] — now reused across the caller↔Bridge edge for free.
+2. **Pause and resume (hours → weeks, zero compute).** When the Bridge parks awaiting an external event, its task returns **`input-required`** (or `auth-required` for a credential blocker). `RemoteA2aAgent` turns that into a **`LongRunningFunctionTool` pause**: the caller's invocation *ends* (zero compute), the peer `task_id` + `context_id` persist on the [[bridge-aggregate-model|session]], and a later `FunctionResponse` resumes to the *same* task. This is the **same** native durability the Bridge already uses for [[bridge-adk|HITL]] — now reused across the caller↔Bridge edge for free. (A real park/resume needs the graph wiring above; `AgentTool`'s throwaway session cannot host it.)
 
 ## Waiting is `input-required` — and the edge already emits it
 
@@ -72,20 +94,31 @@ Live progress rides the standard streaming event: a **`TaskStatusUpdateEvent` ca
 | weeks-scale wakeup | callback | `PushNotificationConfig` (Phase 3, `adr-0008`) |
 | terminal | deliverable | `ExchangeTurn` artifact on `COMPLETED` |
 
+## Durable state restore — what ships vs. what we build
+
+A weeks-scale pause (mechanism 2) only pays off if the caller can **come back to the same state** after its process has died and restarted. That restore is mostly **already in the platform** — the custom surface is small and well-bounded (full breakdown + rationale in `adr-0010` §4; source-verified against `google-adk` 2.7.0 + `a2a-sdk`).
+
+The webhook is a **doorbell, not a restore**: `PushNotificationConfig` delivers only "task X changed" — it neither carries the caller's state nor puts the agent back where it paused. Restore is a *separate* mechanism (persistent stores + resumability); the wake signal is *necessary but not sufficient*.
+
+- **DEFAULT (config swap):** `DatabaseSessionService`/`VertexAiSessionService` (session state + event history); `DatabaseTaskStore` (task + artifacts + `context_id`); `tasks/get`/`tasks/resubscribe`; peer ids ride `event.custom_metadata`, auto-repopulated on resume; the Runner auto-matches a `FunctionResponse` to the paused call; push-notification **sender** on the Bridge.
+- **EXPERIMENTAL:** `ResumabilityConfig(is_resumable=True)` — the switch that makes a park survive a restart (`@experimental`, 2.7.0; pin + seam-cover, [[bridge-adk]] SDK-risk).
+- **CUSTOM (Phase 3):** a **webhook receiver** (a2a-sdk is sender-only; `adk web` can't host one) + a **`task_id`→session index**; the receiver then calls `runner.run_async(...)` and everything downstream is DEFAULT.
+
+**Consequence for sequencing:** durable park/resume across a restart needs only the DEFAULT stores + the EXPERIMENTAL switch — **no HTTP, testable by resuming via `run_async` manually.** That work (S1-6) de-risks the webhook path, which adds only the two CUSTOM pieces and only when a leg must outlive the process.
+
 ## M0 note — the port was removed; the consumer is now native
 
-The [[bridge-collect|Collect]] tracer bullet (M0) originally consumed the Bridge through a hand-rolled `BridgeClient` port + `A2ABridgeClient` (a blocking `message/send` → `tasks/get` poll loop) wrapped in a `FunctionTool`. Once the wire contract was validated the port was **removed** (not merely tracer-bullet-only): the address agent now consumes the Bridge as a native `RemoteA2aAgent` wired as a **`sub_agent`** (`agents/src/bridge_client/build_bridge_remote_agent`), and the pure A2A wire helpers survive in `bridge_client/wire.py`. This goes beyond the original `adr-0009` (which retained the port as a permanent double) — recorded in the **adr-0009 amendment (2026-08-15)**. Sprint 1 grows the Collect loop against the native consumer, switching the wiring from transfer to `AgentTool` for the completeness gate (above).
+The [[bridge-collect|Collect]] tracer bullet (M0) originally consumed the Bridge through a hand-rolled `BridgeClient` port + `A2ABridgeClient` (a blocking `message/send` → `tasks/get` poll loop) wrapped in a `FunctionTool`. Once the wire contract was validated the port was **removed** (not merely tracer-bullet-only); the pure A2A wire helpers survive in `bridge_client/wire.py`. Sprint 1 grows the Collect loop against the native consumer. The full wiring trajectory (port removal → transfer → `AgentTool` interim → `Workflow` target) is recorded in `adr-0010`.
 
 ## Status
 
 - **Decided (`adr-0009`):** `RemoteA2aAgent` is the canonical consumer; waits are `input-required` (native pause), progress is `TaskStatusUpdateEvent.status.message`, integration-extension mode pinned (`use_legacy=True` until validated).
+- **Decided (`adr-0010`):** the durable construct is a native `Workflow` graph (service-agent shape above); `AgentTool` is the interim; `LoopAgent` a deprecated fallback; state restore is mostly DEFAULT. Migration `AgentTool → Workflow` = **S1-6**, behind two spike gates.
 - **Committed / already in the edge:** `_status_for` maps a pending collection → `INPUT_REQUIRED` ([[bridge-a2a-edge]]); native HITL pause/resume ([[bridge-adk]]).
-- **Landed (2026-08-15):** the address agent consumes the Bridge as a native `RemoteA2aAgent` (S1-2: wired as a **`BridgeAgentTool`** call-and-return; initially a transfer sub-agent); the M0 `BridgeClient` port was removed (adr-0009 amendment). Mock park (`INPUT_REQUIRED`) + non-empty `status.message` progress are covered by the seam suite.
-- **Landed (2026-08-15, S1-2):** the wiring switched from transfer to a **`BridgeAgentTool`** (`AgentTool` over `RemoteA2aAgent`) so control returns with the `ExchangeTurn`; the structured `CollectRequest` is restored on the send path via a `task_id`-guarded `RequestInterceptor`. Covered by the seam suite.
-- **Landed (2026-08-15, S1-3/S1-4):** the **`is_satisfied`** gate (S1-3) is wired as the authoritative `check_completeness` tool, and the multi-turn Collect loop (S1-4) threads one durable exchange **`context_id`** across rounds via session state (task-vs-context distinction above). See `PLAN.md`.
-- **Sprint 1 (remaining):** grow the mock into the multi-turn contract double — document arrivals across turns, faked chase/timeout, distinct-issuer bill fixtures (S1-5). See `PLAN.md`.
-- **Risk:** `RemoteA2aAgent` is `@a2a_experimental` in `google-adk` 2.7.0 — pin and cover in the shared seam suite (`docs/decisions/adr-0001-stack.md`).
+- **Landed (S1-2/S1-3/S1-4):** native consumer as a `BridgeAgentTool` call-and-return; `CollectRequest` restored via a `task_id`-guarded interceptor; the authoritative `check_completeness` gate; the multi-turn Collect loop threading one durable exchange `context_id` across rounds. Details in `PLAN.md` + `adr-0010`.
+- **Sprint 1 (remaining):** grow the mock into the multi-turn contract double (S1-5); migrate the loop onto the `Workflow` graph + prove durable park/resume with no HTTP (S1-6).
+- **Risk:** `RemoteA2aAgent` is `@a2a_experimental` and `ResumabilityConfig` is `@experimental` in `google-adk` 2.7.0 — pin and cover in the shared seam suite (`docs/decisions/adr-0001-stack.md`).
 
 ## Related
-- [[bridge-a2a-edge|A2A edge]] (server side), [[bridge-adk|running on ADK]], [[bridge-long-running|long-running collection]], [[bridge-collect|Collect]]
-- **Decision record:** `docs/decisions/adr-0009-native-a2a-consumer.md`
+- [[bridge-a2a-edge|A2A edge]] (server side), [[bridge-adk|running on ADK]], [[bridge-long-running|long-running collection]], [[bridge-collect|Collect]], [[bridge-collect-scenarios|Collect scenarios]] (rejection · delays · keeping context)
+- **Decision records:** `docs/decisions/adr-0009-native-a2a-consumer.md` (native consumer + wire vocabulary) · `docs/decisions/adr-0010-durable-consumer-construct.md` (durable construct + state restore)

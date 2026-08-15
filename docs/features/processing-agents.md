@@ -4,6 +4,8 @@
 
 Every phase is **agent-first**: the processing agent (the counterparty that owns per-turn decisions, sense B) is built before the Bridge code for that phase. The agent defines the A2A contract, so the multi-turn negotiation is nailed before the Bridge is committed. *The difference between demos is the agent, not the Bridge.*
 
+**The general shape (all service agents).** Every service agent — Address, Benefits, RFP — is the *same* construct: a native **`Workflow`** graph with a `RemoteA2aAgent` collect node → a deterministic Sense-B gate node (e.g. `is_satisfied`) → an `LlmAgent` presenter node, on one durable session. Only the nodes and the gate vary per demo, not the graph kind. Canonical statement + the interim `AgentTool` wiring and `AgentTool → Workflow` migration: `wiki/bridge-a2a-consumer.md` ("Service-agent architecture") and `docs/decisions/adr-0010-durable-consumer-construct.md`.
+
 ## Scope
 - **Address processing agent** (Release 1) — bounded Collect loop; satisfaction function `gov-id OR 2 distinct bills`; emits requirements list per turn.
 - **Mock Document Bridge** (Release 1, permanent) — speaks the A2A multi-turn contract, injects fixture arrivals, reports a ledger, fakes chase/timeout. Persists as the contract double / agent-side test harness for every later phase.
