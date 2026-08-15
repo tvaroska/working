@@ -51,10 +51,10 @@
   2. Enumerate the six seams as stub interfaces/markers so Sprint 1 has a home: **Sessions, Task store, Exchange store, Skill registry, Scheduler, Extraction**. Each gets a `@pytest.mark.seam("<name>")`.
   3. Document the rule in `docs/` (or extend `wiki/bridge-seams.md`): mock→real and local→GCP swaps must be **no-ops for the agent**; parity is **terminal-outcome, not ledger-identical**. _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.3-seam-test-harness.md)_
 
-- [ ] **S0.4 — Frontend scaffold.** React + TypeScript + Vite + MUI via **pnpm**; Playwright configured (empty suite ok).
+- [x] **S0.4 — Frontend scaffold.** React + TypeScript + Vite + MUI via **pnpm**; Playwright configured (empty suite ok).
   1. `frontend/` — `pnpm create vite` (react-ts), add MUI, ESLint + Prettier, `tsconfig` strict.
   2. Minimal app shell (routing placeholder for the three Sprint-1 surfaces); `pnpm lint` + `pnpm test` + `pnpm build` all green.
-  3. `frontend/playwright.config.ts` + one smoke e2e (loads the shell). Wire the frontend CI job (S0.1).
+  3. `frontend/playwright.config.ts` + one smoke e2e (loads the shell). Wire the frontend CI job (S0.1). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.4-frontend-scaffold.md)_
 
 - [ ] **S0.5 — IaC (Terraform) skeleton — layout + fmt/validate only.** Base infra itself is **Sprint 2**; Sprint 0 only lays the structure so it isn't retrofitted.
   1. `infra/` — module/`envs` directory convention, `versions.tf` (provider pins), remote-state backend stub (commented until the bucket exists).
