@@ -123,15 +123,9 @@ class BridgeAgentTool(AgentTool):
         )
 
         invocation_context = tool_context._invocation_context
-        parent_app_name = (
-            invocation_context.app_name if invocation_context else None
-        )
+        parent_app_name = invocation_context.app_name if invocation_context else None
         child_app_name = parent_app_name or self.agent.name
-        plugins = (
-            invocation_context.plugin_manager.plugins
-            if self.include_plugins
-            else None
-        )
+        plugins = invocation_context.plugin_manager.plugins if self.include_plugins else None
         runner = Runner(
             app_name=child_app_name,
             agent=self.agent,
@@ -199,9 +193,7 @@ class BridgeAgentTool(AgentTool):
         # Fallback: mirror AgentTool's text/error behavior.
         if last_content is None or last_content.parts is None:
             return last_error_message or ""
-        merged_text = "\n".join(
-            p.text for p in last_content.parts if getattr(p, "text", None)
-        )
+        merged_text = "\n".join(p.text for p in last_content.parts if getattr(p, "text", None))
         if not merged_text and last_error_message:
             return last_error_message
         return merged_text

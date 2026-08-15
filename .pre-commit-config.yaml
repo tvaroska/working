@@ -1,0 +1,39 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^(agents|bridge)/.*\.py$
+      - id: ruff-format
+        files: ^(agents|bridge)/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: prettier-frontend
+        name: prettier (frontend)
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|md)$
+        entry: bash -c 'pnpm -C frontend run format:check'
+      - id: terraform-fmt
+        name: terraform fmt
+        language: system
+        pass_filenames: false
+        files: ^infra/.*\.tf$
+        entry: bash -c 'terraform -chdir=infra/terraform fmt -check -recursive'
+      - id: skills-validate
+        name: agentskills validate
+        language: system
+        pass_filenames: false
+        files: ^skills/.*
+        entry: bash -c 'for d in skills/*/; do [ -f "$${d}SKILL.md" ] || continue; uvx --from skills-ref==0.1.1 agentskills validate "$$d" || exit 1; done'

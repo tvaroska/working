@@ -64,10 +64,11 @@
   1. `skills/address-proof/` in the Agent Skills folder format (skill manifest + the address satisfaction description the Bridge reasons over — `wiki/bridge-collect`), sourced from `docs/lessons-learned.md §C1` demo values (`gov-id` / `utility-bill`, party `jordan-lee`).
   2. CI job runs `skills-ref validate` on every folder under `skills/`; document the local command in the dev-env doc (S0.7). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.6-skills-scaffold-ci.md)_
 
-- [ ] **S0.7 — Dev-env + contributor workflow.** Make setup one command and lint automatic.
+- [x] **S0.7 — Dev-env + contributor workflow.** Make setup one command and lint automatic.
   1. Root `README`/`CONTRIBUTING` (or a `Makefile`/`justfile`): `setup` (`uv sync` in `agents/` + `bridge/`, `pnpm install` in `frontend/`), `test`, `lint`, `fmt` targets.
   2. `pre-commit` config: `ruff` (lint+format) on Python, Prettier on frontend, `terraform fmt` on `infra/`, `skills-ref validate` on `skills/`.
   3. `.env.example` conventions consolidated (Vertex vars for `agents/`, `BRIDGE_CARD_URL`/`BRIDGE_BASE_URL`); confirm `.env` gitignored, `.env.example` tracked.
+  _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.7-dev-env-contributor-workflow.md)_
 
 - [ ] **S0.8 — Stack + open-decision sign-off (gate, not code).** Resolve and record the decisions Sprint 1 builds on, so they're designed in, not retrofitted.
   1. Walk `wiki/bridge-open-questions.md`; convert each resolved item to an ADR or a PLAN note, leave the rest explicitly deferred with an owner.

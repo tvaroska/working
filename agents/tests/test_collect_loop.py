@@ -65,9 +65,7 @@ def _fake_ctx(state: dict) -> SimpleNamespace:
 
 def test_interceptor_threads_context_from_state():
     """A fresh send stamps the exchange context id threaded through state."""
-    interceptor = build_collect_request_interceptor(
-        CollectRequest(party=PARTY, skill=SKILL)
-    )
+    interceptor = build_collect_request_interceptor(CollectRequest(party=PARTY, skill=SKILL))
     ctx = _fake_ctx({EXCHANGE_CONTEXT_STATE_KEY: "ctx-abc"})
     fresh = new_text_message("whatever the model happened to say")
 
@@ -81,9 +79,7 @@ def test_interceptor_threads_context_from_state():
 
 def test_interceptor_no_state_leaves_context_empty():
     """No threaded state -> fresh send falls back to an empty context id."""
-    interceptor = build_collect_request_interceptor(
-        CollectRequest(party=PARTY, skill=SKILL)
-    )
+    interceptor = build_collect_request_interceptor(CollectRequest(party=PARTY, skill=SKILL))
     ctx = _fake_ctx({})
     fresh = new_text_message("kickoff")
 
@@ -95,9 +91,7 @@ def test_interceptor_no_state_leaves_context_empty():
 
 def test_interceptor_passthrough_on_resume_with_state():
     """A resume request (task_id set) is passed through unchanged even with state."""
-    interceptor = build_collect_request_interceptor(
-        CollectRequest(party=PARTY, skill=SKILL)
-    )
+    interceptor = build_collect_request_interceptor(CollectRequest(party=PARTY, skill=SKILL))
     ctx = _fake_ctx({EXCHANGE_CONTEXT_STATE_KEY: "ctx-abc"})
     resume = new_text_message(
         "Here is the requested proof.", task_id="task-123", context_id="ctx-1"
@@ -256,9 +250,7 @@ def test_loop_iterates_until_gate_satisfied():
         async for event in runner.run_async(
             user_id=PARTY,
             session_id="loop",
-            new_message=types.Content(
-                role="user", parts=[types.Part(text="collect")]
-            ),
+            new_message=types.Content(role="user", parts=[types.Part(text="collect")]),
         ):
             for fr in event.get_function_responses():
                 if fr.name == "document_bridge":

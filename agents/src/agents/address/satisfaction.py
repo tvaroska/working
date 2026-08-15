@@ -28,9 +28,7 @@ class SatisfactionResult(BaseModel):
 
     done: bool
     outstanding: list[str] = Field(default_factory=list)
-    accepted_issuers: list[str] = Field(
-        default_factory=list
-    )  # sorted canonical set (parity, A2)
+    accepted_issuers: list[str] = Field(default_factory=list)  # sorted canonical set (parity, A2)
 
 
 def is_satisfied(status: CollectionStatus) -> SatisfactionResult:
@@ -66,9 +64,7 @@ def is_satisfied(status: CollectionStatus) -> SatisfactionResult:
     done = gov_id_ok or len(bill_issuers) >= REQUIRED_DISTINCT_ISSUERS
     outstanding = [] if done else [GOV_ID, UTILITY_BILL]
 
-    return SatisfactionResult(
-        done=done, outstanding=outstanding, accepted_issuers=bill_issuers
-    )
+    return SatisfactionResult(done=done, outstanding=outstanding, accepted_issuers=bill_issuers)
 
 
 def _coerce_status(raw: dict | CollectionStatus | ExchangeTurn) -> CollectionStatus:
@@ -121,9 +117,7 @@ def check_completeness(tool_context: ToolContext) -> dict:
     raw = tool_context.state.get(COLLECTION_STATUS_STATE_KEY)
     if not raw:
         # No collection yet -> not done, both alternatives outstanding.
-        return SatisfactionResult(
-            done=False, outstanding=[GOV_ID, UTILITY_BILL]
-        ).model_dump()
+        return SatisfactionResult(done=False, outstanding=[GOV_ID, UTILITY_BILL]).model_dump()
 
     status = _coerce_status(raw)
     return is_satisfied(status).model_dump()

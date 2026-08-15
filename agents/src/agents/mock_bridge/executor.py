@@ -68,11 +68,7 @@ class MockBridgeExecutor(AgentExecutor):
         self._park = park
 
         # Eagerly load every distinct ledger entry across scenario steps (fail fast).
-        entry_ids = {
-            entry_id
-            for step in scenario.steps
-            for entry_id in step.ledger_ids
-        }
+        entry_ids = {entry_id for step in scenario.steps for entry_id in step.ledger_ids}
         self._entries: dict[str, LedgerEntry] = {
             entry_id: load_entry(entry_id, evals_path) for entry_id in entry_ids
         }
@@ -151,9 +147,7 @@ class MockBridgeExecutor(AgentExecutor):
         # Emit WORKING with a non-empty progress message (so message/send with
         # return_immediately returns immediately), then hold. Sleeping BEFORE
         # start_work() would delay the send response and defeat the async surface.
-        await updater.start_work(
-            message=new_text_message("Collecting address proof…")
-        )
+        await updater.start_work(message=new_text_message("Collecting address proof…"))
         await asyncio.sleep(self._hold_seconds)
 
         # Faked chase/timeout: emit non-empty WORKING status updates (S1-5).
@@ -185,9 +179,7 @@ class MockBridgeExecutor(AgentExecutor):
         """
         updater = TaskUpdater(event_queue, context.task_id, context.context_id)
         if resume:
-            await updater.start_work(
-                message=new_text_message("Resuming with provided input…")
-            )
+            await updater.start_work(message=new_text_message("Resuming with provided input…"))
         # Build ledger from the step's entry ids.
         ledger = [self._entries[i] for i in step.ledger_ids]
         turn = build_exchange_turn(

@@ -72,11 +72,7 @@ def build_collect_request_interceptor(
         # channel) so the loop stays on one exchange; fall back to the request's
         # own context id (empty on a first turn). ``ctx`` may be None in hermetic
         # interceptor unit tests.
-        threaded = (
-            ctx.session.state.get(context_state_key)
-            if ctx and ctx.session
-            else None
-        )
+        threaded = ctx.session.state.get(context_state_key) if ctx and ctx.session else None
         context_id = threaded or a2a_request.context_id
         if context_id:
             # a2a-sdk proto string field: assign only a non-empty value (setting

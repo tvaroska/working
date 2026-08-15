@@ -40,9 +40,7 @@ EXPECTED_DATA = CollectRequest(party=PARTY, skill=SKILL).model_dump(mode="json")
 
 def test_interceptor_injects_collect_request_datapart():
     """A fresh send (no task_id) is rewritten to the CollectRequest DataPart."""
-    interceptor = build_collect_request_interceptor(
-        CollectRequest(party=PARTY, skill=SKILL)
-    )
+    interceptor = build_collect_request_interceptor(CollectRequest(party=PARTY, skill=SKILL))
     fresh = new_text_message("whatever the model happened to say")
 
     sentinel = object()
@@ -56,9 +54,7 @@ def test_interceptor_injects_collect_request_datapart():
 
 def test_interceptor_passthrough_on_resume():
     """A resume request (task_id set) is passed through unchanged (S1-4 guard)."""
-    interceptor = build_collect_request_interceptor(
-        CollectRequest(party=PARTY, skill=SKILL)
-    )
+    interceptor = build_collect_request_interceptor(CollectRequest(party=PARTY, skill=SKILL))
     resume = new_text_message(
         "Here is the requested proof.",
         task_id="task-123",
@@ -135,7 +131,4 @@ def test_send_path_datapart_and_control_return_live():
     assert doc["doctype"] == "gov-id"
     assert doc["disposition"] == "accepted"
     assert doc["extraction"]["fields"]["key_fields"]["name"] == "Jordan Lee"
-    assert (
-        doc["extraction"]["fields"]["key_fields"]["address"]
-        == "14 Elm Row, Springfield"
-    )
+    assert doc["extraction"]["fields"]["key_fields"]["address"] == "14 Elm Row, Springfield"

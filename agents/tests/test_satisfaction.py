@@ -45,9 +45,7 @@ def _entries(*ids: str) -> list[LedgerEntry]:
     result = []
 
     for entry_id in ids:
-        raw_entry = next(
-            (e for e in data["documents"] if e["id"] == entry_id), None
-        )
+        raw_entry = next((e for e in data["documents"] if e["id"] == entry_id), None)
         if not raw_entry:
             raise ValueError(f"Entry ID {entry_id} not found in eval fixture")
 

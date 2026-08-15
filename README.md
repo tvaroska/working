@@ -33,3 +33,5 @@ Python 3.12+ · Google ADK · FastAPI · Pydantic (core + agents) · React + Typ
 ## Status
 
 Design consolidated; **implementation starting** at Milestone 0 (contract tracer bullet) — see [`PLAN.md`](PLAN.md). The four-phase roadmap (Address → Benefits → RFP → Maturity) is in [`docs/roadmap.md`](docs/roadmap.md).
+
+**Contributing / dev setup:** see [`CONTRIBUTING.md`](CONTRIBUTING.md) — `make setup` then `make test`.

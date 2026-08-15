@@ -46,6 +46,6 @@ The skills spec already sketches the binding: a doctype skill is `schema + promp
 ## Alternatives considered
 
 - **Hard-fail when the operative engine can't serve a doctype.** Simple rule, but breaks the "extraction always works" property and makes Document AI adoption an all-or-nothing migration. Rejected in favor of Gemini fallback.
-- **Auto-select purely by capability with no per-doctype preference.** Loses the ability to state a doctype's preferred engine (e.g. a compliance doctype that should prefer Document AI). Kept a preference field; capability still overrides when the processor is absent. 
+- **Auto-select purely by capability with no per-doctype preference.** Loses the ability to state a doctype's preferred engine (e.g. a compliance doctype that should prefer Document AI). Kept a preference field; capability still overrides when the processor is absent.
 - **Model the binding outside the skill (central engine-map file).** Splits doctype config across two places and breaks "adding a doctype is a folder upload." Rejected — binding stays in the skill.
 - **Ship the Document AI binding fields only when the adapter lands.** Would force re-authoring existing skills at Phase 4. Rejected — define the inert contract now.

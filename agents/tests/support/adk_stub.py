@@ -92,11 +92,7 @@ class ScriptedLoopModel(BaseLlm):
     def _call(self, name: str) -> types.Content:
         return types.Content(
             role="model",
-            parts=[
-                types.Part(
-                    function_call=types.FunctionCall(name=name, args={})
-                )
-            ],
+            parts=[types.Part(function_call=types.FunctionCall(name=name, args={}))],
         )
 
     async def generate_content_async(
@@ -118,16 +114,12 @@ class ScriptedLoopModel(BaseLlm):
             if "done" not in response and isinstance(response.get("result"), dict):
                 response = response["result"]
             if response.get("done"):
-                content = types.Content(
-                    role="model", parts=[types.Part(text=self.final_text)]
-                )
+                content = types.Content(role="model", parts=[types.Part(text=self.final_text)])
             else:
                 # Not done -> chase the outstanding proof.
                 content = self._call(self.bridge_tool_name)
         else:
             # Unknown tool -> terminate rather than spin.
-            content = types.Content(
-                role="model", parts=[types.Part(text=self.final_text)]
-            )
+            content = types.Content(role="model", parts=[types.Part(text=self.final_text)])
 
         yield LlmResponse(content=content)

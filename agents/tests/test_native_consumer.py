@@ -54,9 +54,7 @@ async def _drive_park_resume_raw(base_url: str) -> dict:
     """
     async with httpx.AsyncClient() as hx:
         card = await A2ACardResolver(hx, base_url).get_agent_card()
-        factory = ClientFactory(
-            ClientConfig(httpx_client=hx, streaming=False, polling=True)
-        )
+        factory = ClientFactory(ClientConfig(httpx_client=hx, streaming=False, polling=True))
         client = factory.create(card)
 
         observed: list[TaskState] = []
