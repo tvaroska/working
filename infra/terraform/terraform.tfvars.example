@@ -1,0 +1,5 @@
+# Copy to a real tfvars (gitignored) or pass via envs/<env>/*.tfvars.
+# Sprint 0 skeleton: only the two core vars. Full defaults (CIDRs, DB tier, Cloud Tasks
+# queue, gateway toggle, etc.) land in Sprint 2 — see docs/lessons-learned.md §C4.
+project_id = "your-gcp-project-id"
+region     = "us-central1"

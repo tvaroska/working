@@ -56,9 +56,9 @@
   2. Minimal app shell (routing placeholder for the three Sprint-1 surfaces); `pnpm lint` + `pnpm test` + `pnpm build` all green.
   3. `frontend/playwright.config.ts` + one smoke e2e (loads the shell). Wire the frontend CI job (S0.1). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.4-frontend-scaffold.md)_
 
-- [ ] **S0.5 — IaC (Terraform) skeleton — layout + fmt/validate only.** Base infra itself is **Sprint 2**; Sprint 0 only lays the structure so it isn't retrofitted.
+- [x] **S0.5 — IaC (Terraform) skeleton — layout + fmt/validate only.** Base infra itself is **Sprint 2**; Sprint 0 only lays the structure so it isn't retrofitted.
   1. `infra/` — module/`envs` directory convention, `versions.tf` (provider pins), remote-state backend stub (commented until the bucket exists).
-  2. CI step: `terraform fmt -check` + `terraform validate` (no `plan`/`apply`, no credentials). Keep it minimal so it doesn't absorb Sprint 2's front-loaded Terraform work (roadmap cross-cutting risk).
+  2. CI step: `terraform fmt -check` + `terraform validate` (no `plan`/`apply`, no credentials). Keep it minimal so it doesn't absorb Sprint 2's front-loaded Terraform work (roadmap cross-cutting risk). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.5-iac-terraform-skeleton.md)_
 
 - [ ] **S0.6 — Skills scaffold + `skills-ref validate` in CI.** Agent Skills format from the start (ADR-0001).
   1. `skills/address-proof/` in the Agent Skills folder format (skill manifest + the address satisfaction description the Bridge reasons over — `wiki/bridge-collect`), sourced from `docs/lessons-learned.md §C1` demo values (`gov-id` / `utility-bill`, party `jordan-lee`).
