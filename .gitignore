@@ -1,0 +1,41 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / pnpm / Vite
+node_modules/
+frontend/**/dist/
+.vite/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Terraform
+infra/terraform/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
