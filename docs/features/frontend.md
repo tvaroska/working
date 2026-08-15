@@ -1,6 +1,6 @@
 # Feature — Frontend (Three Surfaces)
 
-**Status:** ✅ Built (Release 1 — all three surfaces + time-warp) · **Release:** 1 → extended each phase · **Spec:** `wiki/bridge-frontend.md`, `wiki/bridge-a2ui-edge.md`, `wiki/bridge-zones.md`
+**Status:** 📋 Planned (0%) · **Release:** 1 → extended each phase · **Spec:** `wiki/bridge-frontend.md`, `wiki/bridge-a2ui-edge.md`, `wiki/bridge-zones.md`
 
 Three surfaces, one per actor, make the mediation legible on stage and validate A2UI early. They are A2UI hosts (content-not-pixels) and their split across the trust boundary demonstrates the two-zone model.
 
@@ -23,12 +23,11 @@ Presenter control over the virtual clock: fast-forward an SLA window so `overdue
 - R2 RFP: console shows Requirements mutated live; dashboard casefile view + wrong-doc flags
 - R3 Maturity: Architecture X-Ray overlay; outbound/party-channel views
 
-## Completed Work
+## Build components (Release 1)
+- Processing-Agent Console (`frontend/agent-console/`, internal zone, SSE).
+- Servicer Ops Dashboard (`frontend/ops-dashboard/`, internal zone, SSE).
+- Provider Portal — A2UI Path-B (`frontend/provider-portal/`, external zone).
+- Time-warp presenter control over the virtual clock (`frontend/timewarp/`, plain REST, runs locally — not deployed).
+- Terraform to deploy portal (external zone) + console/dashboard (internal zone).
 
-- **S1-front-1** Processing-Agent Console (`frontend/agent-console/`).
-- **S1-front-2** Servicer Ops Dashboard (`frontend/ops-dashboard/`).
-- **S1-front-3** Provider Portal — A2UI Path-B (`frontend/provider-portal/`).
-- **S1-front-4** Time-warp presenter control over the virtual clock (`frontend/timewarp/`).
-- **S2-front-1** Terraform to deploy portal (external zone) + console/dashboard (internal zone); timewarp runs locally.
-
-**Known gaps** (see `docs/tech-debt.md`): only provider-portal has automated tests (Playwright e2e, backend stubbed at the network boundary); the other three surfaces and `console_server.py` have none. Shared UI/domain code (`theme.ts`, `Panel.tsx`, `Badges.tsx`, `domain/contract.ts`) is copy-pasted across the four apps and drifting — no shared package yet.
+**Watch-items for the build:** each surface hand-maps the snake_case wire to camelCase in its own `domain/` layer — factor shared UI/domain code (`theme.ts`, `Panel.tsx`, `Badges.tsx`, `domain/contract.ts`) into a shared package rather than copy-pasting across the four apps. Playwright e2e stubs the backend at the network boundary; add a component-unit layer and a `console_server` test rather than relying on browser e2e alone. SSE/Playwright and time-warp specifics are in `docs/lessons-learned.md §B`.

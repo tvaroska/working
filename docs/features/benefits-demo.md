@@ -15,6 +15,3 @@ The depth example — the full arc "one comparable view": fan-out → normalize 
 
 ## Validation
 Manual test: 4 carriers (2 Path-A agents ADK+LangGraph, 2 Path-B PDFs), 3 currencies/languages, a live negotiate round with the LangGraph carrier, bind → rollup. Cross-framework interop test: same A2A conversation passes for either counterparty build.
-
-## Completed Work
-_None yet — pre-implementation._

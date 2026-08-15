@@ -1,6 +1,6 @@
 # Feature — Bridge Core
 
-**Status:** ✅ Built (Release 1; local path, GCP adapters written + plan-tested, not yet deployed) · **Release:** 1 (Minimal Showcase) · **Spec:** `wiki/bridge.md`, `wiki/bridge-aggregate-model.md`, `wiki/bridge-seams.md`, `wiki/bridge-edges.md`, `wiki/bridge-dual-path.md`, `wiki/bridge-disposition.md`, `wiki/bridge-proactive.md`
+**Status:** 📋 Planned (0%) · **Release:** 1 (Minimal Showcase) · **Spec:** `wiki/bridge.md`, `wiki/bridge-aggregate-model.md`, `wiki/bridge-seams.md`, `wiki/bridge-edges.md`, `wiki/bridge-dual-path.md`, `wiki/bridge-disposition.md`, `wiki/bridge-proactive.md`
 
 The independent, reusable core — the platform showcase itself. Demos consume it without editing it; if a demo needs a core change, that change is generic and lives here (`wiki/bridge-demo-suite.md`).
 
@@ -18,21 +18,10 @@ The independent, reusable core — the platform showcase itself. Demos consume i
 ## Later releases
 - Four-signal disposition, party memory, cold-inbound edge, Bridge-as-client/outbound, Document AI adapter, multi-tenancy, hardening (Release 3)
 
-## Completed Work
+## Platform-native from day one
+The core runs on ADK natively — the Bridge is an `LlmAgent` (`document_bridge`) with tools (extraction as an `AgentTool` subagent, `run_disposition_gate` as the authoritative KYC gate, `request_human_review` as a `LongRunningFunctionTool`), documents as versioned ADK artifacts, and sessions/artifacts swapping `InMemory…` ↔ `Gcs`/Vertex across the seam. The A2A edge speaks canonical A2A via `a2a-sdk`. These are hard requirements, not later hardening. See `wiki/bridge-adk.md`, `wiki/bridge-a2a-edge.md`, `docs/decisions/adr-0001-stack.md`.
 
-All Release-1 core tasks delivered (`bridge/src/bridge/`), green on the local path (480 tests):
+## Intended layout
+Release-1 core lives under `bridge/src/bridge/`: `aggregate/` (Exchange/task/session/party invariants), `seams/` + `tests/seams/` (interfaces, local + GCP adapters, shared parity suite), `edges/` (A2A + A2UI portal + reference renderer), `dual_path/` (Path A validate-only, Path B extract), `extraction/` (seam + fixture + Gemini adapters, quality/confidence gates), `disposition/` + `classification/` (gates, capped resubmission, HITL suspend/resume, issuer canonicalization), `ledger/` (classified ledger view), `proactive/` (Scheduler seam + SLA policy + virtual clock), `skills/` (Agent Skills loader, Agent-Card regeneration, live skill upload). The mock→real Bridge swap holds behind the same A2A contract with the agent core unchanged. See `docs/features/processing-agents.md`.
 
-- **S1-core-1** Aggregate model — Exchange / task / session / party invariants (`aggregate/`).
-- **S1-core-2** Seam interfaces + local adapters (Sessions, Task/Exchange store, Skill registry, Scheduler) + shared parity suite (`seams/`, `tests/seams/`).
-- **S1-core-3** A2A edge (Path A inbound) + A2UI portal edge (Path B) + reference renderer (`edges/`).
-- **S1-core-4** Dual-path fulfillment — Path A validate-only, Path B extract (`dual_path/`).
-- **S1-core-5** Extraction seam + fixture adapter + extraction graph (quality/confidence gates) (`extraction/`).
-- **S1-core-6** Disposition (gates, capped resubmission, HITL suspend/resume) + classification + issuer canonicalization (`disposition/`, `classification/`).
-- **S1-core-7** Classified ledger — append-only view over exchange tasks (`ledger/`).
-- **S1-core-8** Proactive follow-up — Scheduler seam + SLA policy + virtual clock (`proactive/`).
-- **S1-core-9** Skills loader — Agent Skills format folders, doctype vs process via `metadata.bridge-kind`, pattern as selector (`skills/`).
-- **S1-core-10** Mock → real Bridge swap behind the same A2A contract — agent core unchanged.
-- **S2-infra-1..3** GCP seam adapters (Postgres task/exchange, Cloud Tasks, Agent Engine sessions, GCS skills), Gemini extraction adapter, authenticated A2A + Agent Identity (`seams/gcp/`, `extraction/gemini/`) — plan-tested, not yet run against a live project.
-- **S2-core-1..2** Agent-Card regeneration from installed skills + live skill upload (no restart).
-
-**Known gaps** (see `docs/tech-debt.md`): Google ADK is a declared dependency, not the runtime — the Phase-1 Collect loop is hand-rolled and framework-agnostic (ADK-ready). Document AI extraction and the Gemini classifier are `NotImplementedError` slots (Phase 4 / later). Gemini extraction is off by default (`fixture`) and unproven against the live API in CI.
+**Deferred:** Document AI extraction and the Gemini classifier (Release 3); Gemini extraction defaults to the `fixture` engine locally, with a gated live-API parity run for CI (`docs/lessons-learned.md §C3`).

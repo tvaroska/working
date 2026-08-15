@@ -2,8 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-06
-- **Resolves:** `PLAN.md` → S0-docs-1 (decision 4 of 4)
-- **Context:** `wiki/bridge-open-questions.md` → Open decisions, `wiki/bridge-seams.md`, `wiki/bridge-skills.md`, `docs/architecture.md` §8
+- **Resolves:** open stack decision 4 of 4 (see `docs/roadmap.md`)
+- **Context:** `wiki/bridge-open-questions.md` → Open decisions, `wiki/bridge-seams.md`, `wiki/bridge-skills.md`, `wiki/bridge-skills.md`
 
 ## Context
 
@@ -27,18 +27,18 @@ The skills spec already sketches the binding: a doctype skill is `schema + promp
 2. **Per-doctype capability** decides the concrete engine: if the operative mode selects **Document AI** *and* the doctype has a bound processor (`bridge-docai-processor` non-empty with an entity map) → use Document AI; **otherwise fall back to Gemini** (the doctype's Gemini binding is always present).
 3. The **no-processor fallback is Gemini-only, never a hard failure.** A doctype with no Document AI processor is a fully supported doctype — Gemini is its capability envelope. The seam logs the fallback (for observability) and proceeds; it does **not** error and does **not** silently drop to fixture.
 
-**Phase 1 scope:** only the **fixture** and **Gemini** adapters ship (`wiki/bridge-open-questions.md` minimal cut; `PLAN.md` S1-core-5, S2-infra-2). The Document AI binding fields (`bridge-docai-processor`, `assets/docai-entity-map.yaml`) are **defined in the doctype-skill contract now but inert** until the Document AI adapter lands (Phase 4). Phase-1 doctype skills carry only the Gemini binding.
+**Phase 1 scope:** only the **fixture** and **Gemini** adapters ship (`wiki/bridge-open-questions.md` minimal cut; Release 1). The Document AI binding fields (`bridge-docai-processor`, `assets/docai-entity-map.yaml`) are **defined in the doctype-skill contract now but inert** until the Document AI adapter lands (Phase 4). Phase-1 doctype skills carry only the Gemini binding.
 
 ## Rationale
 
 - **The wiki already leans here.** `wiki/bridge-skills.md` states the Gemini binding is intrinsic, the Document AI binding is optional, and no-processor = Gemini-only capability envelope. This ADR records that lean and makes the resolution order explicit.
 - **Gemini-first fallback over hard failure or auto-select-to-fixture** keeps extraction robust: every doctype always has a working engine (Gemini), so adding Document AI is a per-doctype *upgrade*, never a gate. This is "auto-select the capable engine" resolved conservatively — capable = Gemini unless a processor is explicitly bound.
 - **Declaring the Document AI contract now, inert** means the Phase-4 adapter is a pure seam add with no doctype re-authoring — the one-adapter-swap proof (`wiki/bridge-seams.md`) stays literal.
-- **Binding lives in the skill, engine-agnostic disposition downstream** (see ADR-0004) — the mediation around extraction never moves when the engine is swapped (`docs/architecture.md` §2.1).
+- **Binding lives in the skill, engine-agnostic disposition downstream** (see ADR-0004) — the mediation around extraction never moves when the engine is swapped (`wiki/bridge.md`).
 
 ## Consequences
 
-- Phase-1 extraction seam (`PLAN.md` S1-core-5) implements the fixture + Gemini adapters and the resolution order, with the Document AI branch present but unreachable (no adapter, empty processor bindings).
+- Phase-1 extraction seam (Release 1) implements the fixture + Gemini adapters and the resolution order, with the Document AI branch present but unreachable (no adapter, empty processor bindings).
 - The doctype-skill contract gains two documented, optional keys/assets (`bridge-docai-processor`, `docai-entity-map.yaml`); `skills-ref validate` still governs folder structure, and a Bridge-side check validates the entity map only when a processor is declared.
 - The Document AI adapter (Phase 4, `wiki/bridge-open-questions.md`) reads `bridge-docai-processor` + `docai-entity-map.yaml`; adding it requires no change to existing doctype skills that omit those fields.
 - A per-doctype fallback log line is emitted when Document AI is the operative mode but a doctype lacks a processor — useful signal for coverage gaps.

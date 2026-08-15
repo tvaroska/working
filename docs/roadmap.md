@@ -1,40 +1,34 @@
 # Roadmap — A2A Document Bridge
 
-> Long-term plan across releases. Immediate two-sprint detail lives in `PLAN.md`; the design spec is in `wiki/` (start at `wiki/bridge.md`). This roadmap groups high-level features into recommended sprints and flags where user/stakeholder validation is recommended.
+> The build plan across releases. The design spec is in `wiki/` (start at `wiki/bridge.md`); this roadmap groups features into recommended sprints and flags where stakeholder validation is recommended.
 >
-> **Build sequence:** 4 phases × 2 sprints = 8 sprints. Each phase is agent-first: Sprint A proves behavior locally; Sprint B adds GCP adapters + Terraform and deploys. See `wiki/bridge-implementation-plan.md`.
+> **Build sequence:** 4 phases × 2 sprints = 8 sprints. Each phase is **agent-first**: Sprint A proves behaviour locally; Sprint B adds GCP adapters + Terraform and deploys. Every managed-service boundary is a seam with a local adapter and a GCP adapter, verified by one shared test suite. See `wiki/bridge-implementation-plan.md`.
 >
-> **Last updated:** 2026-08-10
-
----
-
-## Current Quarter Focus
-
-**Release 1 — Minimal Showcase (Address).** The committed core: mediation on the Gemini Enterprise Agent Platform, one demo, end to end. **Code complete and green on the local path (480 tests); the deployed GCP path is written and plan-tested but not yet applied.** Everything else is sequenced but not started. See `wiki/bridge-open-questions.md` for the authoritative minimal-vs-aspirational split.
+> **Status:** clean-slate build — **not yet started**. The three platform bets (ADK-native runtime, canonical A2A via `a2a-sdk`, GCP Agent Platform for prod / local PC for dev) are hard requirements from the first commit (`docs/decisions/adr-0001-stack.md`).
 
 Status legend: ✅ complete · 🚧 in progress · 📋 planned
 
 ---
 
-## Release 1 — Minimal Showcase (Address) 🚧
+## Release 1 — Minimal Showcase (Address) 📋
 
 **Goal:** Prove the thesis — a servicer's agent asks once and receives documentation gathered, chased, normalized, and ready to act on — running on the deployed platform inside the two-zone trust boundary.
 
-**Status:** code complete, green on the local path; deployed GCP path written + plan-tested but not yet applied (Terraform never applied against a real project — see `docs/qa/phase1-checklist.md` GCP-gated rows, still `PENDING (human)`).
-
 **Feature areas** (detail in `docs/features/`):
-- ✅ Bridge core — aggregate model, seams, both edges, dual-path, disposition, classified ledger, proactive follow-up (`docs/features/bridge-core.md`)
-- ✅ Processing agents + mock Bridge contract double (`docs/features/processing-agents.md`)
-- ✅ Frontend — three surfaces + time-warp (`docs/features/frontend.md`)
-- 🚧 GCP substrate + Terraform — written and plan-tested; not yet applied/deployed (`docs/features/gcp-infra.md`)
-- ✅ Address demo + live doctype-add down-payment (`docs/features/address-demo.md`)
+- 📋 Bridge core — aggregate model, seams, both edges, dual-path, disposition, classified ledger, proactive follow-up (`docs/features/bridge-core.md`)
+- 📋 Processing agents + mock Bridge contract double (`docs/features/processing-agents.md`)
+- 📋 Frontend — three surfaces + time-warp (`docs/features/frontend.md`)
+- 📋 GCP substrate + Terraform (`docs/features/gcp-infra.md`)
+- 📋 Address demo + live doctype-add down-payment (`docs/features/address-demo.md`)
 
 **Recommended sprints:**
-- ✅ **Sprint 0** — scaffolding, CI, dev env, stack + open-decision sign-off
-- ✅ **Sprint 1** — Phase 1 local: Address agent, mock Bridge, real Bridge (local adapters), frontend v1, fixtures, shared suite
-- 🚧 **Sprint 2** — Phase 1 GCP: GCP adapters, Terraform base infra, Gemini extraction, live doctype-add — code complete + manual checklist signed on the **local** path; **actual GCP apply/deploy pending**
+- **Milestone 0 — Contract Tracer Bullet** — the thinnest end-to-end slice to validate the input/output design: an ADK `LlmAgent` sends one `CollectRequest`; a mock Bridge accepts it, holds ~10s (`message/send` → `Task{WORKING}` → `tasks/get` poll → `COMPLETED`), and returns an `id` + structured info drawn from `wiki/evals/address/`. No Collect loop, disposition, extraction, frontend, or GCP. The contract models + mock persist into Sprint 1 (`docs/milestone-0-contract-tracer.md`).
+- **Sprint 0** — scaffolding, CI, dev env, stack + open-decision sign-off
+- **Sprint 1** — Phase 1 local: Address agent, mock Bridge, real Bridge (local adapters), frontend v1, fixtures, shared suite. The Address agent runs as an `LlmAgent` on ADK; the A2A edge speaks canonical A2A via `a2a-sdk` from the start.
+- **Sprint 2** — Phase 1 GCP: GCP adapters, Terraform base infra, Gemini extraction, live doctype-add, deploy + manual exit checklist on the deployed path
 
 **User validation:**
+- End of Milestone 0 — **contract sign-off**: review the `CollectRequest` / `CollectionStatus` / `LedgerEntry` shapes and the `tasks/get` async surface before Sprint 1 builds on them.
 - End of Sprint 1 — internal walkthrough: Address runs locally, agent unchanged across mock→real swap.
 - End of Sprint 2 — **exec demo** on the deployed path: two-run live doctype-add (config-only platform proof + separately-narrated agent-policy beat), time-warp escalation climax, clean-artifact delivery. This is the funding-gate moment.
 
@@ -89,3 +83,4 @@ Status legend: ✅ complete · 🚧 in progress · 📋 planned
 - **Sprints 5–6 (RFP) are the most cuttable yet bear the headline** — if schedule slips, protect the live-add beat (Sprint 6) even if emergent-Collect depth (Sprint 5) is trimmed.
 - **The mock Bridge is a maintained artifact, not throwaway** — it is the permanent agent-side test double.
 - **Live-add pulled forward** — a minimal live doctype-add lands in Sprint 2 (Release 1) as the down-payment on the Sprint-6 headline; keep it minimal so it doesn't absorb the front-loaded Terraform sprint.
+- **SDK version risk** — `google-adk` and `a2a-sdk` are load-bearing from day one; pin versions and track `[EXPERIMENTAL]` surfaces (`docs/decisions/adr-0001-stack.md`).

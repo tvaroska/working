@@ -15,6 +15,3 @@ Same core serves two different industries; a whole demo added live with no redep
 
 ## Protect-from-cut rule
 If schedule slips, protect the live-add beat even if emergent-Collect depth is trimmed. The Release-1 Sprint-2 live doctype-add and the Release-2 Benefits doctype-add are its earlier down-payments.
-
-## Completed Work
-_None yet — pre-implementation._

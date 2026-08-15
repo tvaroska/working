@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-06
-- **Resolves:** `PLAN.md` → S0-docs-1 (decision 1 of 4)
+- **Resolves:** open stack decision 1 of 4 (see `docs/roadmap.md`)
 - **Context:** `wiki/bridge-open-questions.md` → Open decisions, `wiki/bridge-skills.md`, `wiki/bridge-disposition.md`, `wiki/bridge-fulfillment-graph.md`
 
 ## Context
@@ -33,7 +33,7 @@ Values are loaded and validated through a Pydantic policy model at skill install
 
 - **The wiki already leans here.** `wiki/bridge-skills.md` states policy already lives in `assets/policy.yaml`; thresholds are policy. This makes the decision a documentation of intent, not a new commitment.
 - **One authoritative source, single mental model.** SLA and thresholds are both "how this process should behave" — keeping them in one `policy.yaml` avoids a split where cadence is configurable but gates are hard-coded.
-- **Config-only tuning fits the thesis.** A new industry / process is new skills, not new code (`docs/architecture.md` §2.3). Tunable gates in the skill keep behavior change on the config side of that line.
+- **Config-only tuning fits the thesis.** A new industry / process is new skills, not new code (`wiki/bridge-patterns.md`). Tunable gates in the skill keep behavior change on the config side of that line.
 - **Defaults keep it minimal and safe.** Coded defaults mean the gates never fail to resolve and a minimal skill stays terse — the change is additive and low-risk.
 
 ## Consequences

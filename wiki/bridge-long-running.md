@@ -12,7 +12,7 @@ updated: 2026-08-15
 
 # Long-running collection (the durable A2A task)
 
-> A real collection is **human-paced** — a party takes days or **weeks** to send what's asked. Over that horizon the exchange cannot be *a thing that is running*: not a held-open connection, not an in-process loop, not in-memory state. It is a **durable A2A task that mostly sits idle**, woken only by two events — a document arriving, or a clock firing. Canonical A2A ([[bridge-a2a-edge|A2A edge]], `adr-0007`) and the ADK-native runtime (`adr-0006`) give exactly the primitives for that.
+> A real collection is **human-paced** — a party takes days or **weeks** to send what's asked. Over that horizon the exchange cannot be *a thing that is running*: not a held-open connection, not an in-process loop, not in-memory state. It is a **durable A2A task that mostly sits idle**, woken only by two events — a document arriving, or a clock firing. Canonical A2A ([[bridge-a2a-edge|A2A edge]]) and the ADK-native runtime (both `docs/decisions/adr-0001-stack.md`) give exactly the primitives for that.
 
 ## The A2A task *is* the long-running unit
 
@@ -32,7 +32,7 @@ Each has a durable home behind a [[bridge-seams|seam]] — the catch is that the
 
 | State | Durable home (committed) | Today (Phase 1 local) |
 |---|---|---|
-| Conversation / turn state, HITL suspension | persisted `SessionService` (Vertex) — resume recovered from the session, not an in-memory map | `InMemorySessionService` — **lost on restart** (`adr-0006` consequences) |
+| Conversation / turn state, HITL suspension | persisted `SessionService` (Vertex) — resume recovered from the session, not an in-memory map | `InMemorySessionService` — **lost on restart** (`adr-0001`) |
 | Documents (versioned per resubmission) | `GcsArtifactService` | `InMemoryArtifactService` — lost on restart |
 | SLA timers + follow-up read-model | **Cloud Tasks** alarms + Bridge-owned relational store | in-process `VirtualClock` + in-memory dict ([[bridge-proactive]], S1-core-8) |
 
@@ -47,7 +47,7 @@ Chasing a silent party is the [[bridge-proactive|proactive follow-up]] ladder re
 Nobody keeps a stream open for weeks. Canonical A2A decouples "learning of progress" from "holding a connection" via three surfaces:
 
 - **`tasks/get`** — poll status at any point, days later, no live stream needed.
-- **`tasks/resubscribe`** — re-attach to the event stream after the inevitable disconnect (the current hand-rolled SSE cannot reconnect — `tech-debt` §9).
+- **`tasks/resubscribe`** — re-attach to the event stream after the inevitable disconnect (a canonical-A2A verb the `a2a-sdk` provides).
 - **Push-notification config (webhooks)** — the *correct* long-running answer: the Bridge calls the servicer back on state change instead of anyone polling or streaming. **Deferred to Phase 4** today ([[bridge-a2a-edge]]); **weeks is the argument for pulling it forward**, since polling for weeks is wasteful and streams don't survive that long.
 
 ## The servicer loop is event-driven, not process-bound
@@ -73,7 +73,7 @@ Weeks-scale forced four lifecycle decisions, recorded in `docs/decisions/adr-000
 
 ## Status
 
-- **Committed / correct in shape:** idle durable task + clock-driven chase + zero-compute HITL suspend; canonical A2A `tasks/get` / `tasks/resubscribe` (`adr-0007`).
+- **Committed / correct in shape:** idle durable task + clock-driven chase + zero-compute HITL suspend; canonical A2A `tasks/get` / `tasks/resubscribe` (`adr-0001`).
 - **Decided (policy, `adr-0008`):** no TTL / no auto-abandon (app closes via `cancel_task`), durable-context/short-credential, backend-enforced retention (window TBD at deploy), push pull-forward to Phase 3.
 - **Phase 3 (implementation):** the durable substrate (Vertex sessions, GCS artifacts, Cloud Tasks timers, persisted SLA read-model) plus the `adr-0008` mechanisms — none built yet.
 

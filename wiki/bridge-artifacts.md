@@ -55,4 +55,4 @@ The artifact story swaps backends exactly like sessions do ([[bridge-gcp-substra
 
 ## Related
 - [[bridge-disposition|disposition]], [[bridge-gcp-substrate|GCP substrate]], [[bridge-edges|two edges]]
-- **Decision record:** `docs/decisions/adr-0006-adk-native-runtime.md`
+- **Decision record:** `docs/decisions/adr-0001-stack.md`

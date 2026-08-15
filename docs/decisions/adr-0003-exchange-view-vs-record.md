@@ -2,8 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-06
-- **Resolves:** `PLAN.md` → S0-docs-1 (decision 2 of 4)
-- **Context:** `wiki/bridge-open-questions.md` → Open decisions, `wiki/bridge-aggregate-model.md`, `docs/architecture.md` §3, `wiki/bridge-seams.md`
+- **Resolves:** open stack decision 2 of 4 (see `docs/roadmap.md`)
+- **Context:** `wiki/bridge-open-questions.md` → Open decisions, `wiki/bridge-aggregate-model.md`, `wiki/bridge-aggregate-model.md`, `wiki/bridge-seams.md`
 
 ## Context
 
@@ -22,18 +22,18 @@ The Exchange **materializes into a standalone stored record** only when genuine 
 - **program membership** (e.g. Benefits program rollup, Phase 2),
 - **reopen** state (an exchange resurrected after closure).
 
-The **Exchange store seam** is still defined and built in Sprint 1 (`PLAN.md` S1-core-2; `wiki/bridge-seams.md`) — the interface and the local + GCP relational adapters exist. What this ADR settles is that in Phase 1 the store is **not written for Address exchanges**: the seam is present for parity and future materialization, and the read path returns a view assembled from tasks. Materialization is a one-way transition triggered by first appearance of exchange-only state; once materialized, the record is the source of truth for that exchange and the view derives from record + tasks.
+The **Exchange store seam** is still defined and built in Sprint 1 (`wiki/bridge-seams.md`) — the interface and the local + GCP relational adapters exist. What this ADR settles is that in Phase 1 the store is **not written for Address exchanges**: the seam is present for parity and future materialization, and the read path returns a view assembled from tasks. Materialization is a one-way transition triggered by first appearance of exchange-only state; once materialized, the record is the source of truth for that exchange and the view derives from record + tasks.
 
 ## Rationale
 
-- **The wiki already leans view.** `wiki/bridge-aggregate-model.md` and `docs/architecture.md` §3 both state Address stays a view; this ADR records that lean as the decision.
+- **The wiki already leans view.** `wiki/bridge-aggregate-model.md` and `wiki/bridge-aggregate-model.md` both state Address stays a view; this ADR records that lean as the decision.
 - **No premature aggregate.** Address has no exchange-only state — everything (accepted docs, outstanding, rejections) is a fold over the per-task states. Storing a redundant row would create a second source of truth to keep consistent, for no Phase-1 benefit.
 - **Minimal and reversible.** Keeping the store seam but not writing it means enabling standalone records later is a code change on one path, not a schema migration or a re-architecture. The trigger conditions are already enumerated.
 - **Consistent with "task = session" invariant.** The durable, resumable state already lives at the task/session level; the exchange is a grouping, so a view is the natural default.
 
 ## Consequences
 
-- Phase-1 classified ledger (`PLAN.md` S1-core-7) is implemented as an **append-only view over exchange tasks**, matching its plan description ("append-only view over exchange tasks: doctype, key fields, disposition").
+- Phase-1 classified ledger (Release 1) is implemented as an **append-only view over exchange tasks**, matching its plan description ("append-only view over exchange tasks: doctype, key fields, disposition").
 - The Exchange store seam + adapters are built (S1-core-2) but exercised by tests via the future-materialization path, not by Address happy-path runs; the shared seam suite must cover both "view-only" and "materialized" reads.
 - A single, explicit **materialization trigger** must be implemented at the point exchange-only state is first written (deferred to whichever phase introduces it — Phase 2 program membership or Phase 3 Requirements). Phase 1 only needs the view path.
 - Exchange identity remains the A2A context token throughout; materialization must not mint a new id.

@@ -59,7 +59,7 @@ A document exchange is never just "valid doc → accept." Real parties send a **
 
 ## Human review is the platform's pause, not ours
 
-When a submission needs a person — low confidence, a flagged field, an escalation — the Bridge pauses on the platform's own construct: a **`LongRunningFunctionTool`** (`request_human_review`), resumed by an id-matched `FunctionResponse`. We deliberately **do not reimplement** this — no app-owned task-parking, no custom suspend/resume table, no bespoke `INPUT_REQUIRED` bookkeeping (that plumbing was written once and then deleted; see *What this replaced*). Leaning on the native pause **is** the point: human-in-the-loop is a headline capability of the Agent Runtime, so showing the Bridge suspend and resume *through the platform* is itself part of the demonstration. The pause's durability rides the `SessionService` backend — InMemory locally, Vertex on deploy — the same swap as every other concern, so we showcase the platform rather than out-build it.
+When a submission needs a person — low confidence, a flagged field, an escalation — the Bridge pauses on the platform's own construct: a **`LongRunningFunctionTool`** (`request_human_review`), resumed by an id-matched `FunctionResponse`. We deliberately **do not reimplement** this — no app-owned task-parking, no custom suspend/resume table, no bespoke `INPUT_REQUIRED` bookkeeping. Leaning on the native pause **is** the point: human-in-the-loop is a headline capability of the Agent Runtime, so showing the Bridge suspend and resume *through the platform* is itself part of the demonstration. The pause's durability rides the `SessionService` backend — InMemory locally, Vertex on deploy — the same swap as every other concern, so we showcase the platform rather than out-build it.
 
 ## Documents cross the wire by reference
 
@@ -70,10 +70,6 @@ An ADK **artifact** lives inside the Bridge — versioned, session-scoped, addre
 
 This keeps the A2A message small and the trust boundary honest: a reference is not a capability — every fetch is scoped to the leg that asked. The app-facing contract (`ExchangeTurn`/`CollectionStatus`) is unchanged in shape; the artifact reference is an *additive* handle on the ledger it already reads. The full lifecycle — versioning, deletion, the two meanings of "artifact" — is [[bridge-artifacts|its own page]].
 
-## What this replaced
-
-Earlier framing treated ADK as *aspirational* — a hand-rolled Collect loop, app-owned task-parking for HITL, a custom session-store adapter. Making the showcase real meant **deleting** that bespoke plumbing in favour of the native constructs above, keeping only the one inversion (deterministic gate as a tool) that compliance genuinely requires.
-
 ## Read next
 - [[bridge-disposition|disposition]] — the KYC decision the gate tool wraps
 - [[bridge-collect|Collect]] — the same LLM-drives / code-gates split on the client side
@@ -82,4 +78,4 @@ Earlier framing treated ADK as *aspirational* — a hand-rolled Collect loop, ap
 
 ## Related
 - [[bridge-patterns|exchange patterns]], [[bridge|the Bridge]]
-- **Decision record:** `docs/decisions/adr-0006-adk-native-runtime.md`
+- **Decision record:** `docs/decisions/adr-0001-stack.md`

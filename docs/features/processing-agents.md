@@ -1,6 +1,6 @@
 # Feature — Processing Agents & Mock Bridge
 
-**Status:** ✅ Built (Release 1 — Address agent + mock Bridge; later-release agents not started) · **Release:** 1 → ongoing · **Spec:** `wiki/bridge-implementation-plan.md`, `wiki/bridge-address-demo.md`, `wiki/bridge-collect.md`
+**Status:** 📋 Planned (0%) · **Release:** 1 → ongoing · **Spec:** `wiki/bridge-implementation-plan.md`, `wiki/bridge-address-demo.md`, `wiki/bridge-collect.md`
 
 Every phase is **agent-first**: the processing agent (the counterparty that owns per-turn decisions, sense B) is built before the Bridge code for that phase. The agent defines the A2A contract, so the multi-turn negotiation is nailed before the Bridge is committed. *The difference between demos is the agent, not the Bridge.*
 
@@ -14,9 +14,9 @@ Every phase is **agent-first**: the processing agent (the counterparty that owns
 ## Key rule
 The mock Bridge is a **maintained artifact, not throwaway** — agent regressions are caught against it without standing up the platform.
 
-## Completed Work
+## Build components (Release 1)
 
-- **S1-agent-1** Address processing agent — multi-turn Collect loop, satisfaction function (`gov-id OR 2 distinct bills`), per-turn requirements (`agents/src/agents/address/`). The loop is transport- and policy-agnostic behind a `BridgeClient` port, which is what makes the mock→real swap a no-op for the agent core.
-- **S1-agent-2** Mock Document Bridge — A2A multi-turn contract, fixture arrivals, ledger reporting, faked chase/timeout (`agents/src/agents/mock_bridge/`); the permanent contract double.
+- Address processing agent — the Collect loop runs as an `LlmAgent` on ADK (the LLM chooses which proof to request; a deterministic `is_satisfied` code gate owns "done" — `gov-id OR 2 distinct bills`), emitting a per-turn requirements list (`agents/src/agents/address/`). The loop is transport- and policy-agnostic behind a `BridgeClient` port, which is what makes the mock→real swap a no-op for the agent core.
+- Mock Document Bridge — the A2A multi-turn contract, fixture arrivals, ledger reporting, faked chase/timeout (`agents/src/agents/mock_bridge/`); the permanent contract double. Parity with the real Bridge is **terminal-outcome, not ledger-identical** (`docs/lessons-learned.md §A2`).
 
-Later-release agents (Benefits, RFP, simulated ADK/LangGraph carriers) are **not started**.
+Later-release agents (Benefits, RFP, simulated ADK/LangGraph carriers) are Release 2+.
