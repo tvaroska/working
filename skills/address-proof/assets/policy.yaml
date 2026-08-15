@@ -1,0 +1,9 @@
+thresholds:
+  resubmit_below: 0.55
+  auto_approve_at: 0.85
+retry:
+  max_resubmissions: 3
+sla:
+  deadline: 3      # ticks
+  cadence: 2       # ticks between nudges
+  max_nudges: 2    # ladder: overdue -> reminder -> escalated

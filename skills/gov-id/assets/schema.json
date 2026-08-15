@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["doctype", "full_name", "document_number", "expiry_date"],
+  "properties": {
+    "doctype": { "type": "string", "enum": ["gov-id"] },
+    "full_name": { "type": "string" },
+    "document_number": { "type": "string" },
+    "issuing_authority": { "type": "string" },
+    "expiry_date": { "type": "string", "format": "date" }
+  }
+}

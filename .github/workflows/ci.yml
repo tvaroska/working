@@ -82,9 +82,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871   # v4.2.1
-      # TODO(S0.6): install skills-ref (package/version unresolved in repo docs) and run:
-      #   for d in skills/*/; do skills-ref validate "$d" || exit 1; done
-      - run: echo "skills job placeholder — wired for real in S0.6"
+      - uses: astral-sh/setup-uv@0d1b58c5f02339bd2e8b5c16ba38a44ed8672d95   # v6.0.0
+      - name: Validate Agent Skills folders
+        run: |
+          status=0
+          for d in skills/*/; do
+            [ -f "${d}SKILL.md" ] || continue
+            echo "== validating ${d}"
+            uvx --from skills-ref==0.1.1 agentskills validate "$d" || status=1
+          done
+          exit $status
 
   frontend:
     needs: changes

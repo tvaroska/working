@@ -60,9 +60,9 @@
   1. `infra/` — module/`envs` directory convention, `versions.tf` (provider pins), remote-state backend stub (commented until the bucket exists).
   2. CI step: `terraform fmt -check` + `terraform validate` (no `plan`/`apply`, no credentials). Keep it minimal so it doesn't absorb Sprint 2's front-loaded Terraform work (roadmap cross-cutting risk). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.5-iac-terraform-skeleton.md)_
 
-- [ ] **S0.6 — Skills scaffold + `skills-ref validate` in CI.** Agent Skills format from the start (ADR-0001).
+- [x] **S0.6 — Skills scaffold + `skills-ref validate` in CI.** Agent Skills format from the start (ADR-0001).
   1. `skills/address-proof/` in the Agent Skills folder format (skill manifest + the address satisfaction description the Bridge reasons over — `wiki/bridge-collect`), sourced from `docs/lessons-learned.md §C1` demo values (`gov-id` / `utility-bill`, party `jordan-lee`).
-  2. CI job runs `skills-ref validate` on every folder under `skills/`; document the local command in the dev-env doc (S0.7).
+  2. CI job runs `skills-ref validate` on every folder under `skills/`; document the local command in the dev-env doc (S0.7). _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.6-skills-scaffold-ci.md)_
 
 - [ ] **S0.7 — Dev-env + contributor workflow.** Make setup one command and lint automatic.
   1. Root `README`/`CONTRIBUTING` (or a `Makefile`/`justfile`): `setup` (`uv sync` in `agents/` + `bridge/`, `pnpm install` in `frontend/`), `test`, `lint`, `fmt` targets.

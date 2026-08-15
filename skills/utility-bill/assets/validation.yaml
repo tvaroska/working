@@ -1,0 +1,8 @@
+rules:
+  recent_bill: { field: statement_date, window_days: 90 }
+  address_present: { field: service_address }
+disposition_signals:
+  legibility: true
+  type_match: true
+  confidence: true
+  completeness: false

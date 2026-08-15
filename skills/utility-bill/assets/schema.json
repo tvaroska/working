@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["doctype", "issuer", "account_holder", "service_address", "statement_date"],
+  "properties": {
+    "doctype": { "type": "string", "enum": ["utility-bill"] },
+    "issuer": { "type": "string", "description": "canonicalized issuer key, e.g. power-co" },
+    "account_holder": { "type": "string" },
+    "service_address": { "type": "string" },
+    "statement_date": { "type": "string", "format": "date" }
+  }
+}

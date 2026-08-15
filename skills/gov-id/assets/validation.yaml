@@ -1,0 +1,8 @@
+rules:
+  not_expired: { field: expiry_date, must_be: future }
+  complete_fields: true
+disposition_signals:
+  legibility: true
+  type_match: true
+  confidence: true
+  completeness: false   # sense-B is the agent's, not the Bridge's
