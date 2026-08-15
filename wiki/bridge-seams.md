@@ -5,7 +5,7 @@ related:
   - "[[bridge-skills]]"
 tags: [bridge]
 status: review
-updated: 2026-08-05
+updated: 2026-08-15
 ---
 
 # Managed-Service Seams
@@ -34,6 +34,23 @@ updated: 2026-08-05
 **Why extraction is a seam — and why two engines.** Extraction is [[bridge|covered by dedicated services]], so the Bridge refuses to marry one engine. The extraction service returns normalized fields plus per-field and overall confidence, legibility, and flagged fields; [[bridge-disposition|disposition]] reads those signals **engine-agnostically**. Phase 1 ships the **Gemini** adapter (schema-driven JSON, multimodal, ~$0.10 / 1k pages) plus a deterministic **fixture** adapter for fast tests. The **Document AI** adapter (a processor per doctype, native per-field confidence, the data-residency / compliance posture some servicers require) lands in a later phase as the one-adapter-swap proof. Note the axis differs from the storage seams: the real engines are deployed either way, selected by config and per-doctype capability, not local-vs-GCP. Adding the second engine later is the thesis made literal — mediation is the focus, extraction is delegated: swap the engine, the mediation around it never moves. **Caveat:** unlike the relational stores, Document AI is not a free swap — Gemini takes an arbitrary schema and prompt, Document AI needs a processor bound per doctype (see [[bridge-skills|doctype engine binding]]).
 
 Some GCP *write* paths (event publish, timer enqueue, memory write) are scoped as client-wiring first, with request assembly landing on the deployed edge — *[Aspirational]*, not part of the [[bridge-open-questions|minimal cut]].
+
+## Testing the seams — one shared suite, two adapters
+
+Every managed-service seam is verified by the **same test suite running against both adapters**, ensuring the mock→real and local→GCP swaps are **no-ops for the agent**. This is the parity claim that lets the Bridge develop at local speed while genuinely showcasing the managed platform.
+
+**The harness:**
+- **`adapter` fixture** (`bridge/tests/support/seams.py`): parametrized over `("local", "gcp")`. The `local` adapter **always** runs; the `gcp` adapter runs **only when `BRIDGE_TEST_GCP=1`** is set (skips otherwise, e.g. in CI without credentials). The *same* test body asserts both.
+- **`@pytest.mark.seam("<name>")` marker**: labels which seam a test covers. The six names are `sessions`, `task_store`, `exchange_store`, `skill_registry`, `scheduler`, `extraction`. A collection-time guard asserts every marker uses a valid seam name (no silent typos).
+- **Seam interfaces home**: `bridge/src/bridge/seams/` — Sprint 1 adds the seam Protocols/ABCs; Sprint 2 adds the GCP adapter implementations. The `Seam` enum in `__init__.py` is the single source of truth for seam names.
+
+**Axis nuance:** Five seams (`sessions`, `task_store`, `exchange_store`, `skill_registry`, `scheduler`) are **local↔gcp storage/infra** seams — the `adapter` fixture's axis. **Extraction is the capability axis** (`fixture|gemini|docai`), deployed either way; both real engines are selected by config and per-doctype capability, not local-vs-GCP. Extraction is named as the sixth seam (for marker + interface organization), but it doesn't parametrize the same way.
+
+**Parity invariants** (enforced by the shared suite):
+1. **Mock→real and local→GCP swaps are no-ops for the agent.** The consuming code (address/benefits/RFP agents, the Bridge core) never keys off which adapter is active. The test suite runs the same assertions against both.
+2. **Parity is terminal-outcome, not ledger-identical.** Mock and real adapters (and local vs. GCP) legitimately diverge turn-by-turn; parity tests assert the same *destination* — terminal reason + accepted-issuer set — never a step-by-step ledger match. See `docs/lessons-learned.md` A2/A3 for the rationale.
+
+**Per-seam override:** `BRIDGE_SEAM_MODE=local|gcp` sets the global default; individual seams can override via `BRIDGE_SEAM_SESSIONS`, `BRIDGE_SEAM_TASK_STORE`, etc. (blank = inherit from global). See `docs/lessons-learned.md` C3 for the env-var contract. Gemini extraction opts in via `BRIDGE_TEST_GEMINI=1`.
 
 ## Related
 - [[bridge-gcp-substrate|GCP substrate]], [[bridge-skills|skills]]

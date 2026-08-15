@@ -32,3 +32,6 @@ select = ["E", "F", "I"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "seam(name): the managed-service seam under test (sessions|task_store|exchange_store|skill_registry|scheduler|extraction)",
+]

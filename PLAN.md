@@ -46,10 +46,10 @@
   4. Note the parity discipline: canonicalization/disposition logic is kept in parity between `bridge/` and `agents/` **by the shared seam suite**, not by import.
   _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.2-bridge-core-scaffold.md)_
 
-- [ ] **S0.3 — Seam test harness convention.** Establish the "**one shared suite, two adapters**" pattern before any seam is built (Sprint 1 designs interfaces; Sprint 2 adds GCP impls).
+- [x] **S0.3 — Seam test harness convention.** Establish the "**one shared suite, two adapters**" pattern before any seam is built (Sprint 1 designs interfaces; Sprint 2 adds GCP impls).
   1. `tests/support/seams.py` (or a `conftest.py` fixture): a parametrized `adapter` fixture yielding `local` always and `gcp` only when credentials are present (else `pytest.skip`) — so the *same* test asserts both.
   2. Enumerate the six seams as stub interfaces/markers so Sprint 1 has a home: **Sessions, Task store, Exchange store, Skill registry, Scheduler, Extraction**. Each gets a `@pytest.mark.seam("<name>")`.
-  3. Document the rule in `docs/` (or extend `wiki/bridge-seams.md`): mock→real and local→GCP swaps must be **no-ops for the agent**; parity is **terminal-outcome, not ledger-identical**.
+  3. Document the rule in `docs/` (or extend `wiki/bridge-seams.md`): mock→real and local→GCP swaps must be **no-ops for the agent**; parity is **terminal-outcome, not ledger-identical**. _(done 2026-08-15; Plan: /home/boris/working/.claude/plans/S0.3-seam-test-harness.md)_
 
 - [ ] **S0.4 — Frontend scaffold.** React + TypeScript + Vite + MUI via **pnpm**; Playwright configured (empty suite ok).
   1. `frontend/` — `pnpm create vite` (react-ts), add MUI, ESLint + Prettier, `tsconfig` strict.
