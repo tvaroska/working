@@ -8,6 +8,7 @@ dependencies = [
     "pydantic>=2",
     "aiosqlite",
     "a2a-document-bridge-contract",
+    "pyyaml",
 ]
 
 [dependency-groups]

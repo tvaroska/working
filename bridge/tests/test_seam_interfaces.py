@@ -14,7 +14,6 @@ import pytest
 from bridge.adapters.local import build_local_adapter
 from bridge.adapters.local.extraction import FixtureExtractionEngine
 from bridge.adapters.local.scheduler import LocalScheduler
-from bridge.adapters.local.skill_registry import LocalSkillRegistry
 from bridge.seams import (
     ALL_SEAMS,
     ExchangeStoreSeam,
@@ -107,18 +106,9 @@ def test_build_local_adapter_unknown_seam_raises():
 
 # Note: the exchange-store deferral test was removed in M1.2 — LocalExchangeStore
 # now implements real view-by-default behavior (see tests/test_exchange_store.py).
-
-
-@pytest.mark.anyio
-async def test_skill_registry_skeleton_defers():
-    """Verify LocalSkillRegistry skeleton methods raise NotImplementedError."""
-    registry = LocalSkillRegistry()
-
-    with pytest.raises(NotImplementedError, match="M1.3"):
-        await registry.list_skills()
-
-    with pytest.raises(NotImplementedError, match="M1.3"):
-        await registry.get_skill("test-skill")
+#
+# Note: the skill-registry deferral test was removed in M1.3 — LocalSkillRegistry
+# now implements real directory-backed behavior (see tests/test_skill_registry.py).
 
 
 @pytest.mark.anyio
