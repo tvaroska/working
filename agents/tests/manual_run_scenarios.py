@@ -23,13 +23,14 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from agents.address.graph import ROUND_COUNT_STATE_KEY, build_address_app
+from agents.address.graph import ROUND_COUNT_STATE_KEY
 from agents.address.satisfaction import (
     TERMINAL_TURN_STATE_KEY,
     _coerce_status,
     is_satisfied,
 )
 from bridge_client.wire import extract_exchange_turn
+from tests.support.app import build_test_app
 from tests.support.live_server import LiveMockServer
 
 PARTY = "jordan-lee"
@@ -54,7 +55,7 @@ async def _run(scenario: str, park: bool = False):
     with LiveMockServer(hold_seconds=0.1, park=park, scenario=scenario) as server:
         session_service = InMemorySessionService()
         runner = Runner(
-            app=build_address_app(server.card_url),
+            app=build_test_app(server.card_url),
             session_service=session_service,
             artifact_service=InMemoryArtifactService(),
         )

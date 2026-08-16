@@ -47,13 +47,13 @@ from google.adk.workflow import Workflow
 from google.genai import types
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from agents.address.graph import build_address_app
 from agents.address.satisfaction import (
     TERMINAL_TURN_STATE_KEY,
     _coerce_status,
     is_satisfied,
 )
 from bridge_client.wire import latest_exchange_turn as _latest_turn
+from tests.support.app import build_test_app
 from tests.support.live_server import LiveMockServer
 
 PARTY = "jordan-lee"
@@ -122,7 +122,7 @@ def _resume_message(paused) -> types.Content:
 def _make_runner(card_url: str, session_service) -> Runner:
     """A durable App runner for the graph (collect node owns its own httpx client)."""
     return Runner(
-        app=build_address_app(card_url),
+        app=build_test_app(card_url),
         session_service=session_service,
         artifact_service=InMemoryArtifactService(),
     )
@@ -336,7 +336,7 @@ def test_build_address_graph_shape():
     ``LoopAgent`` cannot express and the misdiagnosis claimed a ``Workflow``
     could not either), and ``gate --[done]--> present``.
     """
-    graph = build_address_app("http://example.invalid/card.json").root_agent
+    graph = build_test_app("http://example.invalid/card.json").root_agent
     assert isinstance(graph, Workflow)
     assert not hasattr(graph, "sub_agents"), "a Workflow graph has edges, not sub_agents"
 

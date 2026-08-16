@@ -8,7 +8,7 @@ graph) on **one shared, durable session**, whose nodes are
    subclasses the workflow ``BaseNode``, so the remote agent is a node with no
    adapter. A parked (``input-required``) A2A task surfaces as a
    ``LongRunningFunctionTool`` call that pauses the ADK Runner;
-2. the deterministic **gate node** (:func:`_build_gate`) — a code-only
+2. the deterministic **gate node** (:func:`build_gate`) — a code-only
    ``FunctionNode`` that reads the latest collected ``ExchangeTurn`` back from the
    *shared* session events, records it to state, and sets ``ctx.route`` to loop
    back to the collect node (not done) or advance to the presenter (done). No
@@ -34,23 +34,28 @@ event ``custom_metadata``) all live in the durable session store. With a
 restart and resumes — with no HTTP webhook and no ``adk web`` — by feeding a
 ``FunctionResponse`` (matching the paused call) to ``runner.run_async`` on a
 fresh Runner pointed at the same database.
+
+This module holds the graph's reusable *pieces* — the node builders
+(:func:`build_collect_node`, :func:`build_gate`, :func:`build_present`) and the
+graph constants (names, routes, description). The pieces are assembled into the
+``Workflow`` + resumable ``App`` at two sites: the production module-level literal
+in ``agent.py`` (env-resolved Bridge card URL) and ``tests/support/app.py`` (a
+live mock's URL). The edge wiring is intentionally written at both sites rather
+than behind a shared factory — see ADR-0010 §8.
 """
 
 import os
 
 from google.adk.agents.context import Context
-from google.adk.apps import App, ResumabilityConfig
-from google.adk.workflow import START, Edge, Workflow, node
+from google.adk.workflow import node
 
 from bridge_client import EXCHANGE_CONTEXT_STATE_KEY, build_bridge_remote_agent
 from bridge_client.wire import latest_exchange_turn
 from contract import CollectRequest
 
 from .config import (
-    APP_NAME,
     PARTY,
     SKILL,
-    _default_card_url,
 )
 from .satisfaction import (
     TERMINAL_TURN_STATE_KEY,
@@ -62,6 +67,7 @@ COLLECT_NODE_NAME = "document_bridge"
 GATE_NODE_NAME = "satisfaction_gate"
 PRESENT_NODE_NAME = "present"
 GRAPH_NAME = "address_collect_loop"
+GRAPH_DESCRIPTION = "Durable address-proof Collect loop (S1-6)."
 
 # Route tags the deterministic gate emits on the conditional edges.
 ROUTE_AGAIN = "again"  # not done -> loop back into the collect node
@@ -76,7 +82,28 @@ ROUND_COUNT_STATE_KEY = "collect_round_count"
 MAX_ROUNDS = int(os.environ.get("ADDRESS_MAX_ROUNDS", "8"))
 
 
-def _build_gate(max_rounds: int):
+def build_collect_node(card_url: str):
+    """Build the collect node — the platform-native ``RemoteA2aAgent`` Bridge consumer.
+
+    ``card_url`` is the Bridge Agent Card URL, the single mock->real / local->GCP
+    swap point. It is captured into the ``RemoteA2aAgent`` at construction, so each
+    assembly site passes the URL it resolved (env default in ``agent.py``; a live
+    mock's port in tests). ``rerun_on_resume=True`` means a parked collect leg
+    resumes mid-flight (re-run with the resolved ``FunctionResponse``) rather than
+    being fast-forwarded on resume.
+    """
+    return node(
+        build_bridge_remote_agent(
+            card_url,
+            name=COLLECT_NODE_NAME,
+            collect_request=CollectRequest(party=PARTY, skill=SKILL),
+        ),
+        name=COLLECT_NODE_NAME,
+        rerun_on_resume=True,
+    )
+
+
+def build_gate(max_rounds: int = MAX_ROUNDS):
     """Build the deterministic loop-gate node — the "code decides" half of Collect.
 
     The gate reads the latest collected ``ExchangeTurn`` from the shared session,
@@ -119,73 +146,6 @@ async def _present(ctx: Context) -> dict | None:
     return ctx.state.get(TERMINAL_TURN_STATE_KEY)
 
 
-def build_address_app(
-    bridge_card_url: str | None = None,
-    *,
-    max_rounds: int = MAX_ROUNDS,
-) -> App:
-    """Build the durable Collect-loop graph as a resumable ``App`` (S1-6).
-
-    The single factory for the address agent: it constructs the ``Workflow`` graph
-    (``RemoteA2aAgent`` collect node → deterministic gate → present node) inline
-    and wraps it in a resumable ``App``. ``build_address_app(...).root_agent`` is
-    the bare graph for tooling/tests that want one.
-
-    Args:
-        bridge_card_url: URL of the Bridge's Agent Card — the single mock->real /
-            local->GCP swap point (why this stays a factory rather than a module
-            literal: tests inject a live mock's card URL); defaults to the
-            environment (``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``).
-        max_rounds: Loop ceiling enforced by the deterministic gate.
-
-    Returns:
-        A resumable ``App`` wrapping the ``Workflow`` graph, to be run on **one
-        shared, durable session**.
-
-    The graph is deterministic today (code gate + code presenter), so it makes no
-    model call. To add a natural-language summary, drop an ``LlmAgent`` into the
-    present node (``_present``); the routing decision stays in the deterministic
-    gate ("LLM routes, code decides").
-
-    ``ResumabilityConfig(is_resumable=True)`` is what makes a parked leg resumable
-    across a process restart; it lives on ``App``, so a durable run must go through
-    the ``App`` path (not a bare ``agent=``/``node=`` Runner) — docs/lessons-learned
-    A13. ``ResumabilityConfig`` is ``@experimental`` in ADK 2.7.0 (ADR-0012). This
-    only sets the switch; the *durable stores* — ``DatabaseSessionService``
-    (Sessions seam) and the Bridge's ``DatabaseTaskStore`` (Task-store seam) — are
-    wired at ``Runner`` construction by the caller (the default ``__main__`` driver
-    runs ``InMemory*`` for a single-process demo).
-    """
-    card_url = bridge_card_url or _default_card_url()
-
-    # rerun_on_resume=True: a parked collect leg resumes mid-flight (re-run with
-    # the resolved FunctionResponse) rather than being fast-forwarded on resume.
-    collect = node(
-        build_bridge_remote_agent(
-            card_url,
-            name=COLLECT_NODE_NAME,
-            collect_request=CollectRequest(party=PARTY, skill=SKILL),
-        ),
-        name=COLLECT_NODE_NAME,
-        rerun_on_resume=True,
-    )
-    gate = _build_gate(max_rounds)
-    present = node(_present, name=PRESENT_NODE_NAME)
-
-    graph = Workflow(
-        name=GRAPH_NAME,
-        description="Durable address-proof Collect loop (S1-6).",
-        edges=[
-            Edge(from_node=START, to_node=collect),
-            Edge(from_node=collect, to_node=gate),
-            # The conditional loop-back edge: not-done re-enters the collect node.
-            Edge(from_node=gate, to_node=collect, route=ROUTE_AGAIN),
-            Edge(from_node=gate, to_node=present, route=ROUTE_DONE),
-        ],
-    )
-
-    return App(
-        name=APP_NAME,
-        root_agent=graph,
-        resumability_config=ResumabilityConfig(is_resumable=True),
-    )
+def build_present():
+    """Build the terminal present node (see :func:`_present`)."""
+    return node(_present, name=PRESENT_NODE_NAME)

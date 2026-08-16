@@ -21,15 +21,15 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+from .agent import app
 from .config import APP_NAME, PARTY
-from .graph import build_address_app
 from .satisfaction import TERMINAL_TURN_STATE_KEY
 
 
 async def _main() -> None:
     session_service = InMemorySessionService()
     runner = Runner(
-        app=build_address_app(),
+        app=app,
         session_service=session_service,
         artifact_service=InMemoryArtifactService(),
     )
