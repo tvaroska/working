@@ -39,10 +39,12 @@ class LiveMockServer:
         hold_seconds: float = 1.0,
         park: bool = False,
         scenario=None,
+        task_store=None,
     ):
         self.hold_seconds = hold_seconds
         self.park = park
         self.scenario = scenario
+        self.task_store = task_store
         self.port = free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
         self.card_url = f"{self.base_url}/.well-known/agent-card.json"
@@ -56,6 +58,7 @@ class LiveMockServer:
             scenario=self.scenario,
             hold_seconds=self.hold_seconds,
             park=self.park,
+            task_store=self.task_store,
         )
         self.executor = app.state.mock_executor
         config = uvicorn.Config(

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
-from a2a.server.tasks import InMemoryTaskStore
+from a2a.server.tasks import InMemoryTaskStore, TaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill
 from a2a.utils.constants import TransportProtocol
 from starlette.applications import Starlette
@@ -72,6 +72,7 @@ def create_app(
     hold_seconds: float = 10.0,
     park: bool = False,
     evals_path: Path | None = None,
+    task_store: TaskStore | None = None,
 ) -> Starlette:
     """Create the mock Bridge Starlette application.
 
@@ -83,6 +84,10 @@ def create_app(
         park: If True, the first turn parks at INPUT_REQUIRED and a resume turn
             completes it (the adr-0009 pause/resume tracer).
         evals_path: Optional explicit path to expected.json (for testing).
+        task_store: Optional A2A task store. Defaults to ``InMemoryTaskStore``;
+            pass a ``DatabaseTaskStore`` to make the mock's task state durable
+            (the Task-store seam's DEFAULT swap — S1-6/ADR-0010). The swap is a
+            no-op for the consumer: the same JSON-RPC surface, a different store.
 
     Returns:
         A Starlette app serving the Agent Card at /.well-known/agent-card.json
@@ -109,7 +114,7 @@ def create_app(
     )
     handler = DefaultRequestHandler(
         agent_executor=executor,
-        task_store=InMemoryTaskStore(),
+        task_store=task_store if task_store is not None else InMemoryTaskStore(),
         agent_card=card,
     )
 

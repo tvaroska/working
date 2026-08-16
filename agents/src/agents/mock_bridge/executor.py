@@ -158,8 +158,14 @@ class MockBridgeExecutor(AgentExecutor):
             )
 
         if self._park:
-            # Park: a pause awaiting input, not a failure (adr-0009). Carry a
-            # non-empty status.message so the consumer can render the park reason.
+            # Park: a pause awaiting input, not a failure (adr-0009). Emit the
+            # round's ledger *before* parking (a partial, non-terminal collection
+            # — "collected what we could, awaiting more"), so a native durable
+            # consumer persists the collected-so-far ExchangeTurn to its shared
+            # session. That collected state is what the S1-6 restart proof asserts
+            # survives a process restart. Then carry a non-empty status.message so
+            # the consumer can render the park reason.
+            await self._emit_turn_artifact(updater, context, step=step)
             await updater.update_status(
                 TaskState.TASK_STATE_INPUT_REQUIRED,
                 message=new_text_message("Awaiting additional proof to proceed."),
@@ -167,6 +173,31 @@ class MockBridgeExecutor(AgentExecutor):
             return
 
         await self._complete(context, event_queue, step=step, resume=False)
+
+    async def _emit_turn_artifact(self, updater, context, *, step) -> None:
+        """Build the step's ``ExchangeTurn`` and enqueue it as a final artifact chunk.
+
+        ``last_chunk=True`` marks this as a non-partial artifact update. A native
+        durable consumer only persists non-partial events to its shared session,
+        so the deterministic gate — which reads the collected ``ExchangeTurn`` back
+        from ``ctx.session.events`` — never sees the ledger unless the single-shot
+        artifact is flagged terminal here (S1-6). The streaming AgentTool/root
+        consumer is unaffected (it reads the live event stream, partial or not).
+
+        Args:
+            updater: The active ``TaskUpdater`` for this task.
+            context: Request context carrying task_id and context_id.
+            step: The scenario step whose ledger + terminality to encode.
+        """
+        ledger = [self._entries[i] for i in step.ledger_ids]
+        turn = build_exchange_turn(
+            context.context_id,
+            ledger,
+            terminal=step.terminal,
+            outstanding=list(step.outstanding),
+        )
+        artifact_part = new_data_part(turn.model_dump(mode="json"))
+        await updater.add_artifact([artifact_part], last_chunk=True)
 
     async def _complete(self, context, event_queue, *, step, resume: bool) -> None:
         """Attach the ExchangeTurn artifact and mark the task COMPLETED.
@@ -180,16 +211,7 @@ class MockBridgeExecutor(AgentExecutor):
         updater = TaskUpdater(event_queue, context.task_id, context.context_id)
         if resume:
             await updater.start_work(message=new_text_message("Resuming with provided input…"))
-        # Build ledger from the step's entry ids.
-        ledger = [self._entries[i] for i in step.ledger_ids]
-        turn = build_exchange_turn(
-            context.context_id,
-            ledger,
-            terminal=step.terminal,
-            outstanding=list(step.outstanding),
-        )
-        artifact_part = new_data_part(turn.model_dump(mode="json"))
-        await updater.add_artifact([artifact_part])
+        await self._emit_turn_artifact(updater, context, step=step)
         await updater.complete()
 
     async def cancel(self, context, event_queue):

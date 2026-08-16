@@ -106,7 +106,7 @@ A2A client + poll loop. Two traps ride on this:
   `Message` that ADK collapses to `None` — so a status update with no parts vanishes **with no error**.
   Mock and real Bridge must attach a **non-empty** message; the seam suite must assert it round-trips.
 
-### A12. The durable consumer is a `Workflow` graph — and `AgentTool`'s *fresh session* is why
+### A12. The durable consumer is a native graph (shipped as `LoopAgent`) — and `AgentTool`'s *fresh session* is why
 The consumer-wiring trajectory (`adr-0010`) turns on one source-verified fact: **`AgentTool` gets
 control-return right but runs the wrapped `RemoteA2aAgent` in a fresh throwaway child session** (new
 `Runner` + `InMemorySessionService` per call). That single fact — not control-return — is the root of
@@ -129,9 +129,9 @@ boilerplate — and it **structurally blocks native park/resume** (no durable se
   nodes are a `RemoteA2aAgent` **collect** node → a **deterministic Sense-B gate** node (`is_satisfied`
   for Address; the emergent-requirements decision for RFP) → an `LlmAgent` **presenter** node, on one
   shared durable session. Only the nodes and the gate vary per demo; the graph kind does not.
-- **Migration is `AgentTool` → `Workflow`, never → `transfer`/`LoopAgent`.** Two S1-6 spike gates
-  precede the commit: (1) a `RemoteA2aAgent` (non-`LlmAgent`) usable as a `Workflow` node; (2)
-  `input-required` pause propagating/resuming *inside* a `Workflow` (verified inside `LoopAgent`).
+- **Migration was `AgentTool` → graph — and the graph shipped as `LoopAgent`, not `Workflow` (S1-6, realized).** The two spike gates resolved thus: (1) a `RemoteA2aAgent` (non-`LlmAgent`) *is* usable as a graph sub-agent — **confirmed**; (2) the `input-required` pause propagates/resumes and even survives a restart — **but `Workflow`'s conditional loop-back cannot re-enter the collect node**: the scheduler fast-forwards any node that already COMPLETED in the current invocation (`workflow.utils._replay_interceptor.check_interception` Case 1), so a not-done→collect edge never iterates. So the durable graph shipped as the pre-recorded **`LoopAgent` fallback** (`agents/address/graph.py`), which re-runs its sub-agents each iteration on the shared session. `LoopAgent` is `@deprecated` — a live SDK-risk item (`adr-0012`); revisit `Workflow` when a release permits node re-entry / ships a native loop node.
+- **A collected artifact is invisible to a downstream graph node unless emitted `last_chunk=True` (S1-6 trap).** `RemoteA2aAgent` marks an artifact event `partial = not update.last_chunk`; a **partial** event streams to the live consumer but is **not persisted to the shared session**. So a deterministic gate that reads the collected `ExchangeTurn` back from `ctx.session.events` never sees it unless the producer flags the artifact terminal (`updater.add_artifact([...], last_chunk=True)`). The Bridge must emit even a *partial* collection (the collected-so-far ledger before a park) as `last_chunk=True` so the durable session — and the restart proof — can see it.
+- **`DatabaseSessionService` needs the async sqlite driver, and resumability lives on `App`.** `DatabaseSessionService(db_url="sqlite:///...")` raises "the asyncio extension requires an async driver ... 'pysqlite' is not async" — use `sqlite+aiosqlite:///` (deviation from the plan's bare `sqlite:///`). And `ResumabilityConfig(is_resumable=True)` lives on `App`, not on a bare `agent=`/`node=` Runner — a durable run must go through the `App` path (see A13) or a parked leg won't be resumable across a restart.
 
 ### A13. Durable state restore is mostly platform-DEFAULT — the webhook is a doorbell, not a restore
 For a weeks-scale park (A11 / `adr-0009` §2) to pay off, the consumer must return to the **same state**
