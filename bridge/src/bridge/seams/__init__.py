@@ -12,7 +12,23 @@ the GCP adapter implementations. As of S0.3, only the enumeration exists.
 
 from enum import Enum
 
-__all__ = ["Seam", "ALL_SEAMS"]
+from bridge.seams.exchange_store import ExchangeStoreSeam
+from bridge.seams.extraction import ExtractionSeam
+from bridge.seams.scheduler import SchedulerSeam
+from bridge.seams.sessions import SessionsSeam
+from bridge.seams.skill_registry import SkillRegistrySeam
+from bridge.seams.task_store import TaskStoreSeam
+
+__all__ = [
+    "Seam",
+    "ALL_SEAMS",
+    "SessionsSeam",
+    "TaskStoreSeam",
+    "ExchangeStoreSeam",
+    "SkillRegistrySeam",
+    "SchedulerSeam",
+    "ExtractionSeam",
+]
 
 
 class Seam(str, Enum):
