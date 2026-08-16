@@ -27,21 +27,45 @@ from bridge.seams import Seam
 __all__ = ["build_local_adapter"]
 
 
-def build_local_adapter(seam: Seam) -> object:
+def build_local_adapter(seam: Seam, *, durable: bool = False, db_path: str | None = None) -> object:
     """Build and return a local adapter instance for the given seam.
 
     Args:
-        seam: The seam to build an adapter for
+        seam: The seam to build an adapter for.
+        durable: When True, SESSIONS/TASK_STORE return the SQLite-backed
+            ``Database*`` variants (survive a process restart — lessons A13); the
+            other seams ignore it. ``db_path`` is then required. Default False
+            keeps the M1.1 in-memory behavior.
+        db_path: Filesystem path for the SQLite database when ``durable=True``.
 
     Returns:
-        A local adapter instance conforming to the seam's Protocol
+        A local adapter instance conforming to the seam's Protocol.
 
     Raises:
-        ValueError: If the seam is not recognized
+        ValueError: If the seam is not recognized, or ``durable=True`` is requested
+            for SESSIONS/TASK_STORE without a ``db_path``.
 
     Note: Env-var seam selection (C3: BRIDGE_SEAM_*, BRIDGE_EXTRACTION_ENGINE)
     will layer on here in M1.2+/deploy. Today this is a direct seam→adapter dispatch.
+    The durable variant keeps the "swap is a no-op for the agent" idiom: same seam,
+    same Protocol, storage swapped (InMemory* ↔ Database* on sqlite+aiosqlite).
     """
+    if durable and seam in (Seam.SESSIONS, Seam.TASK_STORE):
+        if not db_path:
+            raise ValueError(f"durable={seam.value} requires a db_path")
+        # Lazy import so a plain `import bridge.adapters.local` does not pull
+        # sqlalchemy unless a durable adapter is actually requested.
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        db_url = f"sqlite+aiosqlite:///{db_path}"
+        if seam == Seam.SESSIONS:
+            from google.adk.sessions import DatabaseSessionService
+
+            return DatabaseSessionService(db_url=db_url)
+        from a2a.server.tasks import DatabaseTaskStore
+
+        return DatabaseTaskStore(engine=create_async_engine(db_url), create_table=True)
+
     builders = {
         Seam.SESSIONS: lambda: InMemorySessionService(),
         Seam.TASK_STORE: lambda: InMemoryTaskStore(),

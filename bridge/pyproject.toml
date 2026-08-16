@@ -3,9 +3,10 @@ name = "a2a-document-bridge-core"
 version = "0.0.0"
 requires-python = ">=3.12"
 dependencies = [
-    "google-adk>=2.7.0,<3",
-    "a2a-sdk[http-server]",
+    "google-adk[db]>=2.7.0,<3",
+    "a2a-sdk[http-server,sql]",
     "pydantic>=2",
+    "aiosqlite",
     "a2a-document-bridge-contract",
 ]
 

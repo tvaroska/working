@@ -12,7 +12,6 @@ the parity wiring is intact. Direct factory tests run once (local only, no fixtu
 import pytest
 
 from bridge.adapters.local import build_local_adapter
-from bridge.adapters.local.exchange_store import LocalExchangeStore
 from bridge.adapters.local.extraction import FixtureExtractionEngine
 from bridge.adapters.local.scheduler import LocalScheduler
 from bridge.adapters.local.skill_registry import LocalSkillRegistry
@@ -106,19 +105,8 @@ def test_build_local_adapter_unknown_seam_raises():
 # Skeleton deferral tests (document that NotImplementedError is raised)
 
 
-@pytest.mark.anyio
-async def test_exchange_store_skeleton_defers():
-    """Verify LocalExchangeStore skeleton methods raise NotImplementedError."""
-    store = LocalExchangeStore()
-
-    with pytest.raises(NotImplementedError, match="M1.2"):
-        await store.get("test-context")
-
-    with pytest.raises(NotImplementedError, match="M1.2"):
-        await store.save({})
-
-    with pytest.raises(NotImplementedError, match="M1.2"):
-        await store.materialize("test-context")
+# Note: the exchange-store deferral test was removed in M1.2 — LocalExchangeStore
+# now implements real view-by-default behavior (see tests/test_exchange_store.py).
 
 
 @pytest.mark.anyio

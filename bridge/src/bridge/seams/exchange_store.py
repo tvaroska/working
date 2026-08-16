@@ -30,8 +30,9 @@ class ExchangeStoreSeam(Protocol):
     Exchange = the A2A context (context_id is identity). Phase-1 Address is a
     view over tasks (ADR-0003); the store provides future materialization.
 
-    Note: The concrete exchange record type is defined by M1.2; signatures use
-    `object` here as a placeholder.
+    Note: The concrete exchange record type is ``bridge.aggregate.ExchangeRecord``
+    (defined by M1.2). The Protocol keeps ``object`` in its signatures to avoid an
+    aggregate↔seam import cycle; the local adapter uses ``ExchangeRecord`` concretely.
     """
 
     async def get(self, context_id: str) -> object | None:
