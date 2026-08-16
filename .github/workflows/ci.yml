@@ -26,9 +26,11 @@ jobs:
           filters: |
             agents:
               - 'agents/**'
+              - 'contract/**'
               - '.github/workflows/ci.yml'
             core:
               - 'bridge/**'
+              - 'contract/**'
               - '.github/workflows/ci.yml'
             skills:
               - 'skills/**'

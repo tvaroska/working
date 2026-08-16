@@ -1,13 +1,9 @@
 [project]
-name = "a2a-document-bridge-agents"
+name = "a2a-document-bridge-contract"
 version = "0.0.0"
 requires-python = ">=3.12"
 dependencies = [
-    "google-adk[db]>=2.7.0,<3",
-    "a2a-sdk[http-server,sql]",
     "pydantic>=2",
-    "aiosqlite",
-    "a2a-document-bridge-contract",
 ]
 
 [dependency-groups]
@@ -21,10 +17,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agents", "src/bridge_client"]
-
-[tool.uv.sources]
-a2a-document-bridge-contract = { path = "../contract", editable = true }
+packages = ["src/contract"]
 
 [tool.ruff]
 line-length = 100

@@ -21,12 +21,12 @@ and [ADR-0010](../docs/decisions/adr-0010-durable-consumer-construct.md).
 ```
 agents/
   src/
-    contract/          Pydantic models: CollectRequest, ExchangeTurn, CollectionStatus, LedgerEntry
     bridge_client/     Native RemoteA2aAgent Bridge consumer (build_bridge_remote_agent) + pure A2A wire helpers (adr-0009)
     agents/
       mock_bridge/     a2a-sdk mock server (permanent Sprint-1 contract double)
       address/         Address service agent — durable Workflow graph (graph.py) + config + manual driver
   tests/               Pytest suite; test_durable_graph.py is the S1-6 validation gate
+../contract/           Shared contract package: CollectRequest, ExchangeTurn, CollectionStatus, LedgerEntry (ADR-0011)
 ```
 
 ## Run the test
