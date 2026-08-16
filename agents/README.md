@@ -122,6 +122,50 @@ The earlier interim wiring — a `BridgeAgentTool` call-and-return (S1-2) and an
 
 `tests/test_native_consumer.py` covers the wire contract (raw client, Test A) and the `RemoteA2aAgent` pause/resume spike (Test B); `tests/test_interceptor.py` locks the send-path `CollectRequest` DataPart and the durable context threading; `tests/test_durable_graph.py` drives the graph end to end and asserts park/resume across a restart. `RemoteA2aAgent` is `@a2a_experimental` and `ResumabilityConfig` is `@experimental` (ADK 2.7.0, ADR-0012) — tracked in the experimental-surface register.
 
+## Frontend-v1 demo BFF servers
+
+The Frontend-v1 surfaces (`frontend/`) are each backed by a thin Starlette BFF
+server under `agents/src/agents/address/`. These are **demo furniture** (lessons
+A9) — the only agent-side code allowed to `import bridge`; the production agent
+(`agent.py`/`graph.py`) imports none of them. Each module exposes a module-level
+`app` built by a `create_app(...)` factory (testable without a live socket), and
+snake_case JSON on the wire (the frontend `domain/` layers map to camelCase — B3).
+
+Port map (`docs/lessons-learned.md §C2`):
+
+| Server                              | Port | Transport        | Surface                        |
+| ----------------------------------- | ---- | ---------------- | ------------------------------ |
+| `agents.address.console_server:app` | 8010 | SSE              | Processing-Agent Console       |
+| `agents.address.ops_server:app`     | 8011 | SSE              | Servicer Ops Dashboard         |
+| `agents.address.portal_server:app`  | 8012 | REST             | Provider Portal (A2UI Path-B)  |
+| `agents.address.timewarp_server:app`| 8013 | REST (no SSE, B4)| Time-warp presenter control    |
+| `bridge.edges.a2a.app:create_app`   | 8000 | JSON-RPC (A2A)   | Bridge core inbound edge       |
+
+Start one server (from `agents/`):
+
+```bash
+uv run uvicorn agents.address.console_server:app --port 8010
+```
+
+Or use the repo-root run scripts (they export the demo env — `BRIDGE_CLOCK_MODE=
+virtual`, `BRIDGE_EXTRACTION_ENGINE=fixture`, `BRIDGE_SEAM_MODE=local`):
+
+```bash
+scripts/run-console.sh    # 8010 (SSE)
+scripts/run-ops.sh        # 8011 (SSE)
+scripts/run-portal.sh     # 8012 (REST)
+scripts/run-timewarp.sh   # 8013 (REST, no SSE)
+scripts/run-core.sh       # 8000 (Bridge core, --factory)
+scripts/run-all.sh        # all of the above + the theater Vite dev server (5173)
+```
+
+SSE note: the console/ops servers use raw Starlette `StreamingResponse`
+(`text/event-stream`) rather than `sse-starlette` — matching the repo's existing
+Starlette usage and avoiding an extra dependency. Each emitter yields a
+`snapshot` frame, incremental `turn`/`event` frames, then a terminal `done` event
+before closing cleanly (B2). `test_{console,ops,portal,timewarp}_server.py` drive
+the `create_app` factories over an ASGI test client.
+
 ## Lint
 
 ```bash

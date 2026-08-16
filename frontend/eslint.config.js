@@ -8,8 +8,8 @@ import prettierConfig from 'eslint-config-prettier';
 export default tseslint.config(
   {
     ignores: [
-      'dist',
-      'node_modules',
+      '**/dist/**',
+      '**/node_modules/**',
       'coverage',
       'playwright-report',
       'test-results',
@@ -20,7 +20,7 @@ export default tseslint.config(
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2023,
-      globals: globals.browser,
+      globals: { ...globals.browser, ...globals.node },
     },
     plugins: {
       'react-hooks': reactHooks,
@@ -28,6 +28,9 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Surfaces are BFF-driven: effects legitimately fetch on mount and reset
+      // state when subscribing to an SSE stream (external-system sync).
+      'react-hooks/set-state-in-effect': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },

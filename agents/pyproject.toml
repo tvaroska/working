@@ -8,6 +8,10 @@ dependencies = [
     "pydantic>=2",
     "aiosqlite",
     "a2a-document-bridge-contract",
+    # Frontend-v1 demo BFF servers (console/ops/portal/timewarp) run under uvicorn.
+    # Starlette itself arrives transitively via a2a-sdk[http-server]; the BFF servers
+    # use raw Starlette StreamingResponse for SSE (no sse-starlette dependency).
+    "uvicorn",
 ]
 
 [dependency-groups]
@@ -15,8 +19,10 @@ dev = [
     "pytest>=8",
     "ruff>=0.6",
     # M1.13 test-only: drive the durable graph against the *real* Bridge edge for
-    # mock→real terminal-outcome parity. The production agent must NOT import bridge;
-    # only the parity test server (tests/support/live_bridge_server.py) does.
+    # mock→real terminal-outcome parity. The production agent (agent.py/graph.py) must
+    # NOT import bridge; only the parity test server (tests/support/live_bridge_server.py)
+    # and the demo BFF servers (agents/address/*_server.py — Frontend-v1) do. The BFF
+    # servers are demo furniture (lessons A9), imported only in local dev / tests.
     "a2a-document-bridge-core",
 ]
 
