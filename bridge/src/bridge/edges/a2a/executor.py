@@ -36,7 +36,7 @@ from a2a.helpers.proto_helpers import get_data_parts, new_data_part, new_text_me
 from a2a.server.agent_execution import AgentExecutor
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Task, TaskState, TaskStatus
-from contract import CollectRequest, Disposition
+from contract import CollectRequest, Disposition, Extraction
 
 from bridge.adapters.local.extraction import FixtureDocument
 from bridge.adapters.local.skill_registry import LocalSkillRegistry
@@ -53,6 +53,7 @@ from bridge.requirements import (
 from bridge.seams.extraction import ExtractionSeam
 from bridge.skills import DispositionThresholds
 
+from .dispatch import PathKind, classify_arrival, looks_like_extraction
 from .plan import CollectPlan, plan_for_skill
 from .trust import authorize_leg
 
@@ -211,11 +212,28 @@ class BridgeExecutor(AgentExecutor):
         await updater.start_work(message=new_text_message(f"Collecting {skill or 'proof'}…"))
         await asyncio.sleep(self._hold_seconds)
 
-        # Drive the round through core: classify each arrived doc, record a leg task.
+        # M1.11: Dual-path dispatch — detect Path A (structured Extraction) vs Path B (default)
         legs = self._tasks.setdefault(ctx, [])
-        for fid in collect_round.fixture_ids:
-            extraction = await self._engine.extract(FixtureDocument(fixture_id=fid), None)
-            entry, result = classify_document(fid, extraction, thresholds=self._thresholds)
+        message = getattr(context, "message", None)
+        parts = message.parts if message is not None else []
+        path = classify_arrival(parts)
+
+        # Detect a Path-A structured Extraction DataPart (beyond the CollectRequest)
+        structured_extraction = None
+        if path is PathKind.A and message is not None:
+            for data in get_data_parts(message.parts):
+                if looks_like_extraction(data):
+                    # Schema-validate the structured response (contract error if malformed)
+                    structured_extraction = Extraction.model_validate(data)
+                    break
+
+        # Path A branch: structured response → validate-only (no engine.extract)
+        if structured_extraction is not None:
+            doc_id = f"{context.task_id}-doc-{len(legs)}"
+            # Path A: classify the structured response (NO engine.extract call)
+            entry, result = classify_document(
+                doc_id, structured_extraction, thresholds=self._thresholds
+            )
 
             # M1.9: stamp rejected entries with reason_code + message (verbatim relay)
             if entry.disposition == Disposition.REJECTED:
@@ -225,12 +243,37 @@ class BridgeExecutor(AgentExecutor):
             leg = create_leg_task(
                 context_id=ctx,
                 ordinal=next_ordinal(legs),
-                task_id=f"{context.task_id}-doc-{len(legs)}",
+                task_id=doc_id,
             )
             stamp_ledger_entry(leg, entry)
             legs.append(leg)
 
-        terminal = plan.is_terminal(r)
+            # Terminality: reuse plan.is_terminal for scripted terminal/non-terminal rounds
+            terminal = plan.is_terminal(r)
+
+        # Path B branch (default): existing fixture loop, unchanged
+        else:
+            # Drive the round through core: classify each arrived doc, record a leg task.
+            for fid in collect_round.fixture_ids:
+                extraction = await self._engine.extract(FixtureDocument(fixture_id=fid), None)
+                entry, result = classify_document(fid, extraction, thresholds=self._thresholds)
+
+                # M1.9: stamp rejected entries with reason_code + message (verbatim relay)
+                if entry.disposition == Disposition.REJECTED:
+                    code, msg = explain_rejection(
+                        entry, result.gate, explanations=self._explanations
+                    )
+                    entry = entry.model_copy(update={"reason_code": code, "message": msg})
+
+                leg = create_leg_task(
+                    context_id=ctx,
+                    ordinal=next_ordinal(legs),
+                    task_id=f"{context.task_id}-doc-{len(legs)}",
+                )
+                stamp_ledger_entry(leg, entry)
+                legs.append(leg)
+
+            terminal = plan.is_terminal(r)
 
         # Non-empty progress before the artifact (A11).
         collected = len(legs)

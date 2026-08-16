@@ -49,10 +49,10 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from contract import Disposition, LedgerEntry
+from contract import Disposition, Extraction, LedgerEntry
 from pydantic import BaseModel
 
-from bridge.disposition import Gate, classify_document
+from bridge.disposition import DispositionResult, Gate, classify_document
 from bridge.seams.extraction import ExtractionError, ExtractionSeam
 from bridge.skills import DispositionThresholds
 
@@ -63,6 +63,8 @@ __all__ = [
     "FulfillmentResult",
     "run_fulfillment",
     "resume_fulfillment",
+    "route_disposition",
+    "validate_only",
 ]
 
 
@@ -121,6 +123,139 @@ class FulfillmentResult(BaseModel, frozen=True):
     suspended: bool  # True iff phase in RESUMABLE_PHASES
     terminal: bool  # True iff phase in TERMINAL_PHASES
     awaiting_resubmission: bool  # True iff phase == RESUBMIT
+
+
+def route_disposition(
+    entry: LedgerEntry,
+    result: DispositionResult,
+    *,
+    attempts: int = 0,
+    max_resubmissions: int = 3,
+) -> FulfillmentResult:
+    """Route a completed disposition (gate) into a FulfillmentResult phase.
+
+    The SHARED convergence point for both fulfillment paths: Path B
+    (run_fulfillment, after engine.extract) and Path A (validate_only, no
+    extract) both funnel through here, so the same signals reach the same
+    terminal outcome — indistinguishable to the requester (wiki/bridge-dual-path).
+
+    Args:
+        entry: The classified ledger entry.
+        result: The disposition result from classify_document.
+        attempts: Resubmissions requested so far (threaded forward across resubmissions).
+        max_resubmissions: Max resubmissions before escalation (from SkillPolicy).
+
+    Returns:
+        A FulfillmentResult with the phase, disposition, and state flags.
+    """
+    gate = result.gate
+
+    if gate == Gate.AUTO_APPROVE:
+        # Accepted, terminal
+        return FulfillmentResult(
+            phase=Phase.AUTO_APPROVE,
+            disposition=Disposition.ACCEPTED,
+            attempts=attempts,
+            entry=entry,
+            terminal=True,
+            suspended=False,
+            awaiting_resubmission=False,
+        )
+
+    elif gate == Gate.HITL_REVIEW:
+        # Pending, suspended (awaits human review)
+        return FulfillmentResult(
+            phase=Phase.HITL,
+            disposition=Disposition.PENDING,
+            attempts=attempts,
+            entry=entry,
+            terminal=False,
+            suspended=True,
+            awaiting_resubmission=False,
+        )
+
+    elif gate == Gate.UNSUPPORTED:
+        # Rejected, terminal (doctype not in label space)
+        return FulfillmentResult(
+            phase=Phase.UNSUPPORTED,
+            disposition=Disposition.REJECTED,
+            attempts=attempts,
+            entry=entry,
+            terminal=True,
+            suspended=False,
+            awaiting_resubmission=False,
+        )
+
+    elif gate == Gate.RESUBMIT:
+        # Quality issue: resubmit or escalate
+        if attempts < max_resubmissions:
+            # Request resubmission (non-resumable: awaits a fresh document)
+            return FulfillmentResult(
+                phase=Phase.RESUBMIT,
+                disposition=Disposition.REJECTED,  # this attempt is rejected
+                attempts=attempts + 1,
+                entry=entry,
+                terminal=False,
+                suspended=False,
+                awaiting_resubmission=True,
+            )
+        else:
+            # Loop exhausted → escalate (A1: escalation ≠ rejection, disposition=PENDING)
+            return FulfillmentResult(
+                phase=Phase.ESCALATED,
+                disposition=Disposition.PENDING,  # not rejected (A1)
+                attempts=attempts,
+                entry=entry,
+                terminal=False,
+                suspended=True,
+                awaiting_resubmission=False,
+            )
+
+    else:
+        # Unreachable (all gates covered)
+        raise ValueError(f"Unknown gate: {gate}")
+
+
+def validate_only(
+    extraction: Extraction,
+    *,
+    doc_id: str | None = None,
+    thresholds: DispositionThresholds = DispositionThresholds(),
+    attempts: int = 0,
+    max_resubmissions: int = 3,
+) -> FulfillmentResult:
+    """Path A: validate a structured response + run the disposition gate.
+
+    NO extraction call — the party's agent already normalized the document; the
+    Bridge only schema-validates (the caller passes an already-validated
+    Extraction) and runs the SAME deterministic gate as Path B (A3: a structured
+    claim can still be HITL/rejected — it is not auto-accepted). Converges via
+    route_disposition, so the requester cannot tell the path apart.
+
+    Args:
+        extraction: The already-validated Extraction payload.
+        doc_id: Document identifier. Defaults to "path-a-doc".
+        thresholds: Disposition thresholds (resubmit_below, auto_approve_at).
+            Defaults to DispositionThresholds() (0.55, 0.85).
+        attempts: Resubmissions requested so far (threaded forward across resubmissions).
+            Defaults to 0 (initial extraction).
+        max_resubmissions: Max resubmissions before escalation (from SkillPolicy).
+            Defaults to 3.
+
+    Returns:
+        A FulfillmentResult with the phase, disposition, and state flags.
+
+    Note:
+        Path A has no ExtractionError branch — malformed structured input is a
+        contract/schema failure surfaced at the edge (Extraction.model_validate
+        raises), not a disposition. The extraction is already validated when this
+        function is called.
+    """
+    if doc_id is None:
+        doc_id = "path-a-doc"
+
+    entry, result = classify_document(doc_id, extraction, thresholds=thresholds)
+    return route_disposition(entry, result, attempts=attempts, max_resubmissions=max_resubmissions)
 
 
 async def run_fulfillment(
@@ -193,73 +328,8 @@ async def run_fulfillment(
 
     entry, result = classify_document(doc_id, extraction, thresholds=thresholds)
 
-    # Step 4: route on result.gate
-    gate = result.gate
-
-    if gate == Gate.AUTO_APPROVE:
-        # Accepted, terminal
-        return FulfillmentResult(
-            phase=Phase.AUTO_APPROVE,
-            disposition=Disposition.ACCEPTED,
-            attempts=attempts,
-            entry=entry,
-            terminal=True,
-            suspended=False,
-            awaiting_resubmission=False,
-        )
-
-    elif gate == Gate.HITL_REVIEW:
-        # Pending, suspended (awaits human review)
-        return FulfillmentResult(
-            phase=Phase.HITL,
-            disposition=Disposition.PENDING,
-            attempts=attempts,
-            entry=entry,
-            terminal=False,
-            suspended=True,
-            awaiting_resubmission=False,
-        )
-
-    elif gate == Gate.UNSUPPORTED:
-        # Rejected, terminal (doctype not in label space)
-        return FulfillmentResult(
-            phase=Phase.UNSUPPORTED,
-            disposition=Disposition.REJECTED,
-            attempts=attempts,
-            entry=entry,
-            terminal=True,
-            suspended=False,
-            awaiting_resubmission=False,
-        )
-
-    elif gate == Gate.RESUBMIT:
-        # Quality issue: resubmit or escalate
-        if attempts < max_resubmissions:
-            # Request resubmission (non-resumable: awaits a fresh document)
-            return FulfillmentResult(
-                phase=Phase.RESUBMIT,
-                disposition=Disposition.REJECTED,  # this attempt is rejected
-                attempts=attempts + 1,
-                entry=entry,
-                terminal=False,
-                suspended=False,
-                awaiting_resubmission=True,
-            )
-        else:
-            # Loop exhausted → escalate (A1: escalation ≠ rejection, disposition=PENDING)
-            return FulfillmentResult(
-                phase=Phase.ESCALATED,
-                disposition=Disposition.PENDING,  # not rejected (A1)
-                attempts=attempts,
-                entry=entry,
-                terminal=False,
-                suspended=True,
-                awaiting_resubmission=False,
-            )
-
-    else:
-        # Unreachable (all gates covered)
-        raise ValueError(f"Unknown gate: {gate}")
+    # Step 4: route on result.gate via the shared convergence point
+    return route_disposition(entry, result, attempts=attempts, max_resubmissions=max_resubmissions)
 
 
 def resume_fulfillment(state: FulfillmentResult, *, accept: bool) -> FulfillmentResult:
