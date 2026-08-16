@@ -49,11 +49,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from agents.address.graph import build_address_app, build_address_graph
 from agents.address.satisfaction import (
-    COLLECTION_STATUS_STATE_KEY,
+    TERMINAL_TURN_STATE_KEY,
     _coerce_status,
     is_satisfied,
 )
-from bridge_client.wire import extract_exchange_turn
+from bridge_client.wire import latest_exchange_turn as _latest_turn
 from tests.support.live_server import LiveMockServer
 
 PARTY = "jordan-lee"
@@ -65,11 +65,6 @@ A2A_CONTEXT_ID_META = "a2a:context_id"
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
-
-
-def _latest_turn(events) -> dict | None:
-    """Freshest collected ExchangeTurn from an event stream (reversed scan)."""
-    return extract_exchange_turn(list(reversed(list(events))))
 
 
 def _find_paused_call(events):
@@ -151,7 +146,7 @@ def test_gate1_remote_node_runs_and_gate_reads_output():
         session = asyncio.run(_run_once_in_memory(server.card_url))
 
     # The collected turn landed in shared session state (written by the gate).
-    turn = session.state.get(COLLECTION_STATUS_STATE_KEY)
+    turn = session.state.get(TERMINAL_TURN_STATE_KEY)
     assert turn is not None, "gate did not record the collected ExchangeTurn to state"
     ledger = turn["status"]["ledger"]
     assert len(ledger) == 1
@@ -207,7 +202,7 @@ def test_gate2_pause_and_resume_inside_loop():
     assert len(collected_at_park["status"]["ledger"]) == 1
 
     # After resume the deterministic gate reached the terminal outcome.
-    final = session.state.get(COLLECTION_STATUS_STATE_KEY)
+    final = session.state.get(TERMINAL_TURN_STATE_KEY)
     assert final is not None
     assert final["status"]["terminal"] is True
     assert len(final["status"]["ledger"]) == 2
@@ -243,7 +238,7 @@ async def _run_no_restart(card_url: str, db_path: str):
         pass
     session = await session_service.get_session(app_name=APP_NAME, user_id=PARTY, session_id="s1")
     await runner.close()
-    return session.state.get(COLLECTION_STATUS_STATE_KEY)
+    return session.state.get(TERMINAL_TURN_STATE_KEY)
 
 
 async def _run_with_restart(card_url: str, consumer_db: str):
@@ -291,7 +286,7 @@ async def _run_with_restart(card_url: str, consumer_db: str):
         "collected_before_resume": collected_before_resume,
         "peer_task_id": peer_task_id,
         "peer_context_id": peer_context_id,
-        "final_turn": final.state.get(COLLECTION_STATUS_STATE_KEY),
+        "final_turn": final.state.get(TERMINAL_TURN_STATE_KEY),
     }
 
 

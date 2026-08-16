@@ -112,10 +112,9 @@ def build_collect_request_interceptor(
     ``CollectRequest`` JSON DataPart (``wire.request_to_message``) so the Bridge
     receives the structured request on ``message/send``.
 
-    Durable exchange context (S1-4): a fresh child session per ``AgentTool`` call
-    wipes ``RemoteA2aAgent``'s own context-id history, so the multi-turn Collect
-    loop threads the exchange ``context_id`` through **session state** instead
-    (the gate writes it under ``context_state_key`` after each round).
+    Durable exchange context: the multi-turn Collect loop threads the exchange
+    ``context_id`` through **session state** (the gate writes it under
+    ``context_state_key`` after each round).
     On a fresh send this interceptor stamps the threaded context id on the outbound
     ``message/send`` so every round continues the **same** A2A exchange — no fresh
     context per round. Precedence: threaded state > the request's own context id.

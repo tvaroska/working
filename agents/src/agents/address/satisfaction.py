@@ -1,16 +1,12 @@
 """Deterministic Address completeness gate (sense B) — the code that decides "done".
 
-LLM routes, code decides: this is the authoritative satisfaction function the model
-may call but never override (docs/lessons-learned.md A3). Address rule: proof of
-address is satisfied by one accepted gov-id OR two accepted utility-bills from
-distinct (already-canonical) issuers.
-
-State-key convention: the ADK tool wrapper reads the latest CollectionStatus/ExchangeTurn
-from session state under COLLECTION_STATUS_STATE_KEY = "collection_status". S1-4 writes
-the Bridge tool's returned ExchangeTurn under the same key.
+LLM routes, code decides: ``is_satisfied`` is the authoritative satisfaction
+function a model may consult but never override (docs/lessons-learned.md A3). The
+shipped ``Workflow`` graph gate calls it directly (``agents/address/graph.py``).
+Address rule: proof of address is satisfied by one accepted gov-id OR two accepted
+utility-bills from distinct (already-canonical) issuers.
 """
 
-from google.adk.tools.tool_context import ToolContext
 from pydantic import BaseModel, ConfigDict, Field
 
 from contract import CollectionStatus, Disposition, ExchangeTurn
@@ -18,7 +14,10 @@ from contract import CollectionStatus, Disposition, ExchangeTurn
 GOV_ID = "gov-id"
 UTILITY_BILL = "utility-bill"
 REQUIRED_DISTINCT_ISSUERS = 2
-COLLECTION_STATUS_STATE_KEY = "collection_status"
+
+# Session-state key under which the graph gate records the latest collected
+# ExchangeTurn (as a dict); the present node reads it back as the terminal output.
+TERMINAL_TURN_STATE_KEY = "terminal_turn"
 
 
 class SatisfactionResult(BaseModel):
@@ -101,23 +100,3 @@ def _coerce_status(raw: dict | CollectionStatus | ExchangeTurn) -> CollectionSta
 
     # Could not coerce — return empty (not done)
     return CollectionStatus(ledger=[], outstanding=[], terminal=False)
-
-
-def check_completeness(tool_context: ToolContext) -> dict:
-    """Authoritative completeness gate. Reads the classified ledger from session
-    state (never from the model) and returns {done, outstanding, accepted_issuers}.
-    The model may call this to route; it can never fabricate "done".
-
-    Args:
-        tool_context: ADK ToolContext (injected, not surfaced to model).
-
-    Returns:
-        Dict representation of SatisfactionResult.
-    """
-    raw = tool_context.state.get(COLLECTION_STATUS_STATE_KEY)
-    if not raw:
-        # No collection yet -> not done, both alternatives outstanding.
-        return SatisfactionResult(done=False, outstanding=[GOV_ID, UTILITY_BILL]).model_dump()
-
-    status = _coerce_status(raw)
-    return is_satisfied(status).model_dump()

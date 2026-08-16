@@ -77,4 +77,4 @@ Durable park/resume across a restart (§4) needs only the DEFAULT stores + the E
 
 ## Note
 
-This ADR governs the **consumer construct/wiring and state restore**. It does not change ADR-0009's native-consumer principle or wire vocabulary (`RemoteA2aAgent`, `input-required`, `status.message`) — it *builds on* them. Lessons: `docs/lessons-learned.md` A12 (durable construct + the two "returns") and A13 (restore is DEFAULT; doorbell-not-restore). Build task: `PLAN.md` S1-6. Prose: `wiki/bridge-a2a-consumer.md`.
+This ADR governs the **consumer construct/wiring and state restore**. It does not change ADR-0009's native-consumer principle or wire vocabulary (`RemoteA2aAgent`, `input-required`, `status.message`) — it *builds on* them. Lessons: `docs/lessons-learned.md` A12 (durable construct + the two "returns") and A13 (restore is DEFAULT; doorbell-not-restore). Build task: `PLAN.md` S1-6. Prose: `wiki/bridge-a2a-consumer.md`; deployment of the resume path (restore vs. wake on Cloud Run / Agent Engine) is `wiki/bridge-deploy-resume.md`.

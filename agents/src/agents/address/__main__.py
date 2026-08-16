@@ -23,7 +23,7 @@ from google.genai import types
 
 from .config import APP_NAME, PARTY
 from .graph import build_address_app
-from .satisfaction import COLLECTION_STATUS_STATE_KEY
+from .satisfaction import TERMINAL_TURN_STATE_KEY
 
 
 async def _main() -> None:
@@ -42,7 +42,7 @@ async def _main() -> None:
         app_name=APP_NAME, user_id=PARTY, session_id=session_id
     )
     await runner.close()
-    print(session.state.get(COLLECTION_STATUS_STATE_KEY))
+    print(session.state.get(TERMINAL_TURN_STATE_KEY))
 
 
 if __name__ == "__main__":

@@ -4,25 +4,24 @@ Validates the deterministic satisfaction function against eval fixtures:
 - Gov-id OR branch
 - Distinct-issuer utility-bill counts
 - Only ACCEPTED counts (not pending/rejected)
-- Authoritative tool wrapper reads from session state
+
+`is_satisfied` is the pure gate the shipped Workflow graph calls directly
+(`agents/address/graph.py`).
 """
 
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
 from agents.address.satisfaction import (
-    COLLECTION_STATUS_STATE_KEY,
     GOV_ID,
     UTILITY_BILL,
     SatisfactionResult,
-    check_completeness,
     is_satisfied,
 )
-from contract import CollectionStatus, Disposition, ExchangeTurn, Extraction, LedgerEntry
+from contract import CollectionStatus, Disposition, Extraction, LedgerEntry
 
 
 def _load_evals() -> dict[str, Any]:
@@ -193,65 +192,6 @@ def test_full_corpus_satisfies():
     assert result.outstanding == []
     # Two distinct accepted issuers: power-co, aqua-util
     assert result.accepted_issuers == ["aqua-util", "power-co"]
-
-
-# Tool wrapper tests
-
-
-def test_tool_wrapper_state_absent():
-    """Tool wrapper with absent state returns not-done."""
-    tool_context = MagicMock()
-    tool_context.state = {}
-
-    result = check_completeness(tool_context)
-
-    assert result["done"] is False
-    assert sorted(result["outstanding"]) == [GOV_ID, UTILITY_BILL]
-    assert result["accepted_issuers"] == []
-
-
-def test_tool_wrapper_exchange_turn_dict_satisfied():
-    """Tool wrapper with ExchangeTurn dict (satisfying) → done."""
-    ledger = _entries("gov-id-clean")
-    turn = ExchangeTurn(
-        context_id="test-ctx",
-        status=CollectionStatus(ledger=ledger, outstanding=[], terminal=True),
-    )
-
-    tool_context = MagicMock()
-    tool_context.state = {COLLECTION_STATUS_STATE_KEY: turn.model_dump()}
-
-    result = check_completeness(tool_context)
-
-    assert result["done"] is True
-    assert result["outstanding"] == []
-
-
-def test_tool_wrapper_collection_status_dict_satisfied():
-    """Tool wrapper with CollectionStatus dict (two distinct bills) → done."""
-    ledger = _entries("bill-powerco-clean", "bill-aquautil-clean")
-    status = CollectionStatus(ledger=ledger, outstanding=[], terminal=True)
-
-    tool_context = MagicMock()
-    tool_context.state = {COLLECTION_STATUS_STATE_KEY: status.model_dump()}
-
-    result = check_completeness(tool_context)
-
-    assert result["done"] is True
-    assert result["outstanding"] == []
-    assert result["accepted_issuers"] == ["aqua-util", "power-co"]
-
-
-def test_tool_wrapper_garbage_state_returns_not_done():
-    """Tool wrapper with uncoercible garbage → not-done (no raise)."""
-    tool_context = MagicMock()
-    tool_context.state = {COLLECTION_STATUS_STATE_KEY: "garbage"}
-
-    # Should not raise; should return not-done
-    result = check_completeness(tool_context)
-
-    assert result["done"] is False
-    assert sorted(result["outstanding"]) == [GOV_ID, UTILITY_BILL]
 
 
 def test_satisfaction_result_extra_forbid():

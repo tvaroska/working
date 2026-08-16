@@ -76,4 +76,33 @@ TWO_BILLS = MockScenario(
     ),
 )
 
-SCENARIOS = {s.name: s for s in (GOV_ID_INSTANT, TWO_BILLS)}
+# Rejection -> resubmission is handled *inside a single Collect task* — the Bridge
+# rejects the first document (Sense A) and chases a fresh one until it can return a
+# terminal ledger. It is NOT a consumer-driven second Collect round and NOT a HITL
+# park/resume: "resubmit is deliberately non-resumable — it awaits a fresh document,
+# not a human decision" (CLAUDE.md invariant). So the consumer/graph sees one turn:
+# progress messages narrate the reject-and-chase, and the terminal ledger carries the
+# rejected passport followed by the accepted resubmitted gov-id (one accepted gov-id
+# -> the deterministic gate routes ``done``).
+#
+# (Construct note: a non-terminal first round could not drive a second round here —
+# the native ``RemoteA2aAgent`` only re-sends a CollectRequest on a park/resume
+# ``FunctionResponse`` or fresh user input, not on a bare loop-back with no new
+# content; the loop-back ``again`` edge exists for the park/resume path. Modeling the
+# resubmission Bridge-internally matches both the aggregate model and that construct.)
+REJECT_RESUBMIT = MockScenario(
+    "reject-resubmit",
+    (
+        ScenarioStep(
+            ("passport-unsupported", "gov-id-clean"),
+            terminal=True,
+            chase_messages=(
+                "Passport is not an accepted proof of address — rejected.",
+                "Follow-up sent: please resubmit an accepted document (gov-id).",
+                "Resubmission received: gov-id accepted.",
+            ),
+        ),
+    ),
+)
+
+SCENARIOS = {s.name: s for s in (GOV_ID_INSTANT, TWO_BILLS, REJECT_RESUBMIT)}

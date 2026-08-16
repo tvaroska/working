@@ -33,3 +33,4 @@ The Bridge showcases the Gemini Enterprise Agent Platform — Agent Runtime, Ski
 
 ## Related
 - [[bridge|the Bridge]]
+- [[bridge-deploy-resume|deploying the resumable Collect loop]] — restore vs. wake on Cloud Run / Agent Engine

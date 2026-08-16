@@ -73,9 +73,8 @@ def extract_exchange_turn(events) -> dict | None:
     ``ExchangeTurn``, returning the first dict whose ``status.ledger`` is non-empty
     (the completed collection) or ``None`` if none is present.
 
-    ``AgentTool`` surfaces only the *last* event's text content, dropping
-    ``inline_data`` parts entirely — so the tool must scan **all** events here to
-    recover the structured payload (S1-2 control-return).
+    The Bridge's ``ExchangeTurn`` DataPart may not ride the *last* event, so this
+    scans **all** events to recover the structured payload.
     """
     for event in events:
         if not (event.content and event.content.parts):
@@ -94,3 +93,15 @@ def extract_exchange_turn(events) -> dict | None:
             if isinstance(data, dict) and data.get("status", {}).get("ledger"):
                 return data
     return None
+
+
+def latest_exchange_turn(events) -> dict | None:
+    """Return the *most-recently* collected ``ExchangeTurn`` from a session stream.
+
+    :func:`extract_exchange_turn` returns the *first* matching turn in scan order;
+    a shared session accumulates one artifact per completed round, so scanning
+    **reversed** yields the latest (freshest) turn — the one a loop gate must
+    judge. Keeps the reversed-scan idiom in one place (used by the graph gate and
+    the durability tests).
+    """
+    return extract_exchange_turn(list(reversed(list(events))))

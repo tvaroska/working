@@ -44,6 +44,7 @@ updated: 2026-08-05
 - [[bridge-patterns|exchange patterns]] — Request / Negotiate / Deliver / Collect
 - [[bridge-long-running|long-running collection]] — the durable A2A task; days/weeks with no held connection
 - [[bridge-a2a-consumer|A2A consumer]] — how an agent calls the Bridge: `RemoteA2aAgent`, `input-required` pause, status updates
+- [[bridge-service-agent-architecture|service-agent reference architecture]] — the reusable whole-agent shape: `Workflow` graph (collect · gate · present) on one durable session
 - [[bridge-skills|skills]] — demos as configuration
 - [[bridge-gcp-substrate|GCP substrate]] — seams, network zones, deploy, proactive engine
 

@@ -125,12 +125,15 @@ boilerplate — and it **structurally blocks native park/resume** (no durable se
   `LoopAgent` fallback was **not** taken.
 - **`Workflow` cannot yet be an `LlmAgent` sub-agent** (2.7.0). So the graph sits **on top** with the
   LLM as a *node* (a presenter), never behind an LLM "front". This shapes every service agent.
-- **The general service-agent shape** (`adr-0010`, `wiki/bridge-a2a-consumer.md`): a `Workflow` whose
-  nodes are a `RemoteA2aAgent` **collect** node → a **deterministic Sense-B gate** node (`is_satisfied`
-  for Address; the emergent-requirements decision for RFP) → an `LlmAgent` **presenter** node, on one
-  shared durable session. Only the nodes and the gate vary per demo; the graph kind does not.
+- **The general service-agent shape** (`adr-0010`, `wiki/bridge-service-agent-architecture.md`): a
+  `Workflow` whose nodes are a `RemoteA2aAgent` **collect** node → a **deterministic Sense-B gate** node
+  (`is_satisfied` for Address; the emergent-requirements decision for RFP) → a **presenter** node (a
+  code pass-through today — the routing decision already happened in the gate — or an `LlmAgent` for a
+  natural-language summary), on one shared durable session. Only the nodes and the gate vary per demo;
+  the graph kind does not. The reusable node-by-node spec is the reference-architecture atom.
 - **Migration was `AgentTool` → `Workflow` graph, and it shipped on `Workflow` (S1-6, realized).** The two spike gates resolved thus: (1) a `RemoteA2aAgent` (non-`LlmAgent` `BaseAgent`) *is* usable directly as a `Workflow` node (`BaseAgent` subclasses the workflow `BaseNode`) — **confirmed**; (2) the `input-required` pause propagates/resumes, iterates the conditional loop, and survives a restart *inside a `Workflow`* — **confirmed**. The loop is a `Workflow` conditional cycle (`collect → gate`, `gate --[again]--> collect`, `gate --[done]--> present`); a routed loop-back edge **does** re-enter and re-run the completed collect node (the graph validator *requires* loop-back edges to be conditional; `workflow._workflow._process_triggers` re-runs a re-triggered COMPLETED node with a fresh `NodeState`). **Misdiagnosis, corrected:** an earlier attempt fell back to the deprecated `LoopAgent` claiming the scheduler *fast-forwards any COMPLETED node* (citing `workflow.utils._replay_interceptor.check_interception` Case 1) so the loop never iterates — **empirically refuted**: Case 1 is scoped to **dynamic** nodes (`ctx.run_node()`), not static-graph loop-backs, and a routed self-loop re-runs every round. The genuine `Workflow`-specific obstacle was narrower and lives in the *consumer*, not the graph: **`RemoteA2aAgent`'s resume detection assumes the resolved `FunctionResponse` is the *last* session event** (`_create_a2a_request_for_user_function_response`), but the graph orchestrator appends a workflow event after it, so the remote agent never set the parked `task_id` and re-parked. Fix: the send-path `RequestInterceptor` (`bridge_client/remote_consumer.py`) re-detects the pending resume — the latest user `FunctionResponse` with **no consumer-authored event after it** — and stamps the parked A2A `task_id`/`context_id` from the matching function-call event's `custom_metadata`. Shipped: `agents/address/graph.py`; proven by `agents/tests/test_durable_graph.py` (incl. the headline restart-resume). `LoopAgent` was not taken, so its deprecation risk does not apply.
 - **A collected artifact is invisible to a downstream graph node unless emitted `last_chunk=True` (S1-6 trap).** `RemoteA2aAgent` marks an artifact event `partial = not update.last_chunk`; a **partial** event streams to the live consumer but is **not persisted to the shared session**. So a deterministic gate that reads the collected `ExchangeTurn` back from `ctx.session.events` never sees it unless the producer flags the artifact terminal (`updater.add_artifact([...], last_chunk=True)`). The Bridge must emit even a *partial* collection (the collected-so-far ledger before a park) as `last_chunk=True` so the durable session — and the restart proof — can see it.
+- **The `--[again]-->` loop-back re-collects only via a park/resume, never a bare re-run (S1-6, source-verified).** A routed loop-back edge *does* re-enter the collect node (above) — but the native `RemoteA2aAgent` builds its outbound message from `_construct_message_parts_from_session`, which walks events in reverse and **stops at the collect node's own prior remote response**. On a content-less re-entry (the only intervening events are the gate's workflow-orchestration events) it finds no parts and logs *"No parts to send to remote A2A agent. Emitting empty event."* — so the peer is never re-hit, the gate re-reads the *same* turn, and the loop spins to the `max_rounds` ceiling. The collect node re-sends a fresh `CollectRequest` **only** when there is new user content or a park/resume `FunctionResponse` (the interceptor's resume path). Consequence for modeling: a rejection→resubmission is **not** a consumer-driven second Collect round; it is handled *inside a single Collect task* (the Bridge chases the resubmission and returns one terminal ledger carrying the rejected doc then the accepted one) — which is exactly what A1's *"`resubmit` is deliberately non-resumable — it awaits a fresh document, not a human decision"* and the one-leg-per-exchange aggregate model already imply. The mock's `reject-resubmit` scenario (`agents/mock_bridge/scenarios.py`) and `agents/tests/manual_run_scenarios.py` demonstrate both this and the single-turn `gov-id-instant` path.
 - **`DatabaseSessionService` needs the async sqlite driver, and resumability lives on `App`.** `DatabaseSessionService(db_url="sqlite:///...")` raises "the asyncio extension requires an async driver ... 'pysqlite' is not async" — use `sqlite+aiosqlite:///` (deviation from the plan's bare `sqlite:///`). And `ResumabilityConfig(is_resumable=True)` lives on `App`, not on a bare `agent=`/`node=` Runner — a durable run must go through the `App` path (see A13) or a parked leg won't be resumable across a restart.
 
 ### A13. Durable state restore is mostly platform-DEFAULT — the webhook is a doorbell, not a restore
@@ -156,6 +159,27 @@ Consequence for sequencing: durable park/resume across a restart needs only the 
 EXPERIMENTAL switch and is testable with **no HTTP** (resume via `runner.run_async` manually) — that is
 S1-6. The webhook (Phase 3) adds only the two CUSTOM pieces, and only for legs that must outlive the
 process.
+
+### A14. `adk web` lists an agent only if the package has an `agent.py` — a package that exposes `app`/`root_agent` from `__init__.py` runs but is invisible in the UI
+`adk web` and the non-web `adk api_server` use **different loaders** (`google-adk` 2.7.0,
+`cli/fast_api.py::get_fast_api_app`): the web UI uses `NestedAgentLoader`, everything else uses
+`AgentLoader`. Their discovery predicates disagree:
+- **`AgentLoader`** (api_server, and `AgentLoader.load_agent(name)` directly) accepts a package that
+  exposes a module-level `app` (an `App`) or `root_agent` from its **`__init__.py`** — so it loads and
+  **runs** the agent by name (`POST /run` works).
+- **`NestedAgentLoader.list_agents()`** (the `adk web` app dropdown) counts a directory as an agent
+  **only if `is_single_agent_directory` is True**, i.e. the directory contains an **`agent.py`** (or
+  `root_agent.yaml`). A package exposing `app`/`root_agent` from `__init__.py` is **not listed** — the
+  UI dropdown comes up empty even though the agent loads and runs when addressed by name.
+
+**Fix (what ships):** add a tiny `agent.py` shim next to `__init__.py` that re-exports the entry points
+(`from .graph import app, root_agent`) — `agents/src/agents/address/agent.py`. Both loaders prefer a
+module-level `app` (an `App`) over `root_agent`, so `adk web` surfaces the **durable** construct
+(`ResumabilityConfig`), not a bare graph. Verified end-to-end: with the mock Bridge up and
+`BRIDGE_BASE_URL` set, `adk web src/agents` lists `address`, and a `/run` turn drives the `Workflow`
+collect→gate→present cycle to the terminal accepted-gov-id outcome (deterministic, no model call, no
+credentials). Note the mock Bridge must be running first — the collect node resolves the Agent Card at
+first-turn time (import is side-effect-free; `RemoteA2aAgent` only stores the URL).
 
 ### A10. Keep the "why" next to the invariant
 The load-bearing invariants above (A1–A9) are exactly the ones that were previously scattered across

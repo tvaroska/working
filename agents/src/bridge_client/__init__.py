@@ -2,10 +2,7 @@
 
 Our agents consume the Bridge through ADK's platform-native ``RemoteA2aAgent``
 (adr-0009): the mock->real and local->GCP swap is a **different Agent Card URL**,
-not different agent code. The M0 hand-rolled ``BridgeClient`` port + poll loop was
-removed once the wire contract was validated (see adr-0009 amendment); the interim
-``BridgeAgentTool`` (``AgentTool``) wiring was retired once the durable ``Workflow``
-graph landed (adr-0010, S1-6).
+not different agent code.
 
 This package imports only ``contract`` + stdlib + ``a2a-sdk`` + ``httpx`` +
 ``google-adk`` and must never import anything under ``agents.*``.
@@ -19,6 +16,7 @@ from .remote_consumer import (
 from .wire import (
     BridgeWireError,
     extract_exchange_turn,
+    latest_exchange_turn,
     request_to_message,
     task_to_exchange_turn,
 )
@@ -29,6 +27,7 @@ __all__ = [
     "build_collect_request_interceptor",
     "BridgeWireError",
     "extract_exchange_turn",
+    "latest_exchange_turn",
     "request_to_message",
     "task_to_exchange_turn",
 ]
