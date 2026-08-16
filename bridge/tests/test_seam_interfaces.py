@@ -127,9 +127,25 @@ async def test_scheduler_skeleton_defers():
 
 
 @pytest.mark.anyio
-async def test_extraction_skeleton_defers():
-    """Verify FixtureExtractionEngine skeleton methods raise NotImplementedError."""
+async def test_extraction_engine_extracts():
+    """Verify FixtureExtractionEngine extracts known fixtures and raises on unknown/fail."""
+    from bridge.adapters.local.extraction import FixtureDocument
+
     engine = FixtureExtractionEngine()
 
-    with pytest.raises(NotImplementedError, match="M1.7"):
-        await engine.extract({}, {})
+    # Known fixture extracts successfully
+    doc = FixtureDocument(fixture_id="gov-id-clean")
+    extraction = await engine.extract(doc, None)
+    assert extraction.fields.doctype == "gov-id"
+
+    # Unknown fixture raises ExtractionError
+    from bridge.seams.extraction import ExtractionError
+
+    unknown_doc = FixtureDocument(fixture_id="unknown-fixture-id")
+    with pytest.raises(ExtractionError, match="No fixture found"):
+        await engine.extract(unknown_doc, None)
+
+    # fail=True raises ExtractionError
+    fail_doc = FixtureDocument(fixture_id="gov-id-clean", fail=True)
+    with pytest.raises(ExtractionError, match="fail=True"):
+        await engine.extract(fail_doc, None)

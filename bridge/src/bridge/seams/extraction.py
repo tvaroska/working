@@ -23,7 +23,21 @@ from typing import Protocol, runtime_checkable
 
 from contract import Extraction
 
-__all__ = ["ExtractionSeam"]
+__all__ = ["ExtractionSeam", "ExtractionError"]
+
+
+class ExtractionError(Exception):
+    """Raised by an extraction engine when it cannot produce an Extraction.
+
+    Indicates an illegible-beyond-recovery case or engine fault (distinct from a
+    low-confidence *resubmit* disposition, which is a normal disposition outcome).
+    Drives the extraction_error leaf of the fulfillment graph (M1.7).
+
+    This exception lives in the seam (interface) module so both the adapter (raise)
+    and the graph (except) can import it without the graph importing the adapter.
+    """
+
+    pass
 
 
 @runtime_checkable
