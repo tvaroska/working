@@ -14,6 +14,10 @@ dependencies = [
 dev = [
     "pytest>=8",
     "ruff>=0.6",
+    # M1.13 test-only: drive the durable graph against the *real* Bridge edge for
+    # mock→real terminal-outcome parity. The production agent must NOT import bridge;
+    # only the parity test server (tests/support/live_bridge_server.py) does.
+    "a2a-document-bridge-core",
 ]
 
 [build-system]
@@ -25,6 +29,7 @@ packages = ["src/agents", "src/bridge_client"]
 
 [tool.uv.sources]
 a2a-document-bridge-contract = { path = "../contract", editable = true }
+a2a-document-bridge-core = { path = "../bridge", editable = true }
 
 [tool.ruff]
 line-length = 100
