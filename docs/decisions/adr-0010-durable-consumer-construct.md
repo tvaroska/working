@@ -52,6 +52,8 @@ Migration path is **`AgentTool` → `Workflow`**, never → `transfer`/`LoopAgen
 
 Durable park/resume across a restart (§4) needs only the DEFAULT stores + the EXPERIMENTAL switch and is testable with **no HTTP** (resume via `runner.run_async` manually) — that is S1-6. The webhook receiver + index (§4 CUSTOM) is Phase 3, only for legs that must outlive the process.
 
+**Resolution (S1-6, realized — shipped on `Workflow`, not `LoopAgent`).** Both spike gates pass on `Workflow`: (1) a `RemoteA2aAgent` (non-`LlmAgent` `BaseAgent`) runs directly as a graph node — `BaseAgent` subclasses the workflow `BaseNode`; (2) an `input-required` pause propagates, resumes, and survives a process restart *inside* a `Workflow`. The Collect loop is a `Workflow` **conditional cycle** (`collect → gate`, `gate --[again]--> collect`, `gate --[done]--> present`): a conditional loop-back edge **does** re-enter and re-run the completed collect node — the graph validator *requires* loop-back edges to be routed, and the scheduler re-runs a re-triggered COMPLETED node with a fresh `NodeState` (`_workflow.py::_process_triggers`). The one `Workflow`-specific wrinkle: `RemoteA2aAgent`'s built-in resume detection assumes the resolved `FunctionResponse` is the *last* session event (`_create_a2a_request_for_user_function_response`), which the graph orchestrator breaks by appending a workflow event after it — so the send-path `RequestInterceptor` (`bridge_client.remote_consumer`) re-detects the pending resume and stamps the parked A2A `task_id`/`context_id` on the outbound message so the peer resumes the *same* task. `LoopAgent` was **not** taken; its deprecation risk does not apply to this path. Shipped: `agents/address/graph.py`, proven by `agents/tests/test_durable_graph.py` (incl. the headline restart-resume). See ADR-0012 and `docs/lessons-learned.md` A12.
+
 ## Rationale
 
 - **The root problem is the session, not control-return.** `AgentTool`'s fresh throwaway session is what forces the workarounds and blocks park/resume; a shared durable session removes all of them at once. `Workflow` is the ADK-native form of "the loop + gate move to host orchestration" (Option B).
@@ -61,7 +63,7 @@ Durable park/resume across a restart (§4) needs only the DEFAULT stores + the E
 
 ## Consequences / risks
 
-- **The spike gates may fail.** If a `RemoteA2aAgent` can't be a `Workflow` node, or `input-required` doesn't resume inside a `Workflow`, we fall back to the (deprecated but verified) `LoopAgent` and accept the deprecation risk, tracked under ADR-0001 SDK-risk. Recorded, not assumed away.
+- **The spike gates resolved in `Workflow`'s favor (S1-6, realized).** Both passed on `Workflow` (see §5 Resolution); the `LoopAgent` fallback was not taken, so its deprecation risk does not burden this path. The remaining `Workflow`-specific dependency is on the send-path interceptor re-detecting a resume under the graph's event ordering (a small, seam-covered adapter, not an SDK experimental surface).
 - **`Workflow` cannot yet front an LLM.** The graph must sit on top (LLM as a node). If a future demo needs an LLM to *own* the loop with the graph behind it, revisit.
 - **Interim debt is real but bounded.** Until S1-6, service agents run on `AgentTool` with the hand-threaded `context_id` and `skip_summarization=False`; these are known and are retired by the migration, not patched.
 - **`ResumabilityConfig` is `@experimental`** — the one experimental surface the durable path leans on; pin and seam-cover (ADR-0001, `docs/lessons-learned.md` C5).

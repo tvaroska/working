@@ -2,20 +2,33 @@
 
 This retires the in-turn ``BridgeAgentTool`` (a fresh throwaway ADK session per
 call — which blocks native park/resume, docs/lessons-learned A12) in favour of a
-**durable loop on one shared session**: the Collect loop runs as a native ADK
-iteration agent whose sub-agents are
+**durable graph on one shared session**: the Collect loop runs as a native
+``google.adk.workflow.Workflow`` (a node/edge graph) whose nodes are
 
 1. the **collect node** — the platform-native ``RemoteA2aAgent`` Bridge consumer
-   (``build_bridge_remote_agent``), run *directly* as a sub-agent (no
-   ``AgentTool`` wrapper). A parked (``input-required``) A2A task surfaces as a
-   ``LongRunningFunctionTool`` call that pauses the ADK Runner; and
-2. the deterministic **gate node** (:class:`_SatisfactionGate`) — a code-only
-   ``BaseAgent`` that reads the latest collected ``ExchangeTurn`` back from the
-   *shared* session events, records it to state, and **escalates** (terminates
-   the loop) exactly when the authoritative :func:`is_satisfied` says done. No
-   model may set the route — "LLM routes, code decides" (A3).
+   (``build_bridge_remote_agent``), run *directly* as a graph node (no
+   ``AgentTool`` wrapper). ``BaseAgent`` subclasses the workflow ``BaseNode``, so
+   the remote agent is a node with no adapter. A parked (``input-required``) A2A
+   task surfaces as a ``LongRunningFunctionTool`` call that pauses the ADK Runner;
+2. the deterministic **gate node** (:func:`_build_gate`) — a code-only
+   ``FunctionNode`` that reads the latest collected ``ExchangeTurn`` back from the
+   *shared* session events, records it to state, and sets ``ctx.route`` to loop
+   back to the collect node (not done) or advance to the presenter (done). No
+   model may set the route — "LLM routes, code decides" (A3); and
+3. a terminal **present node** — a code node that exposes the terminal turn as the
+   graph's output. (Swap in an ``LlmAgent`` here for a natural-language summary;
+   the *routing* decision stays in the deterministic gate.)
 
-Because the whole loop runs on **one** session, the collected ledger, the
+The loop is a **conditional cycle**: ``collect -> gate``, ``gate --[again]-->
+collect`` (the loop-back edge), ``gate --[done]--> present``. A ``Workflow``
+conditional loop-back edge *does* re-enter and re-run the completed collect node:
+the graph validator (``utils/_graph_validation.py``) requires loop-back edges to
+be conditional (routed), and the scheduler re-runs a re-triggered COMPLETED node
+with a fresh ``NodeState`` (``_workflow.py::_process_triggers`` skips a node only
+while it is RUNNING or WAITING-with-interrupts). See ADR-0010 §8 / ADR-0012 for
+the resolved spike gates.
+
+Because the whole graph runs on **one** session, the collected ledger, the
 exchange ``context_id``, and the peer A2A ``task_id``/``context_id`` (carried in
 event ``custom_metadata``) all live in the durable session store. With a
 ``DatabaseSessionService`` behind the Sessions seam and
@@ -23,28 +36,14 @@ event ``custom_metadata``) all live in the durable session store. With a
 restart and resumes — with no HTTP webhook and no ``adk web`` — by feeding a
 ``FunctionResponse`` (matching the paused call) to ``runner.run_async`` on a
 fresh Runner pointed at the same database.
-
-**Construct = ``LoopAgent`` (the ADR-0010 §8 fallback), not ``Workflow``.**
-The intended construct was ``google.adk.workflow.Workflow`` with a conditional
-loop-back edge, but that edge cannot re-enter the collect node: the Workflow
-scheduler fast-forwards any node that already COMPLETED in the current
-invocation (``workflow.utils._replay_interceptor.check_interception`` Case 1),
-so the not-done→collect loop never re-runs — spike gate 2's loop-back portion
-fails at runtime. ``LoopAgent`` re-runs its sub-agents each iteration on the
-shared session, propagates the ``input-required`` pause, and terminates on
-``escalate`` — proven by ``tests/test_durable_graph.py``. It is ``@deprecated``
-in ADK 2.7.0; the SDK-risk is tracked under ADR-0001 / ADR-0012. See the ADR-0012
-experimental-surface register for the recorded spike outcomes.
 """
 
 import os
-from typing import AsyncGenerator
 
-from google.adk.agents import BaseAgent, LoopAgent
-from google.adk.agents.invocation_context import InvocationContext
+from google.adk.agents.context import Context
 from google.adk.apps import App, ResumabilityConfig
-from google.adk.events import Event, EventActions
 from google.adk.models import BaseLlm
+from google.adk.workflow import START, Edge, Workflow, node
 
 from bridge_client import build_bridge_remote_agent
 from bridge_client.bridge_tool import EXCHANGE_CONTEXT_STATE_KEY
@@ -66,9 +65,20 @@ from .satisfaction import (
 
 COLLECT_NODE_NAME = "document_bridge"
 GATE_NODE_NAME = "satisfaction_gate"
+PRESENT_NODE_NAME = "present"
 GRAPH_NAME = "address_collect_loop"
+
+# Route tags the deterministic gate emits on the conditional edges.
+ROUTE_AGAIN = "again"  # not done -> loop back into the collect node
+ROUTE_DONE = "done"  # done (or the round ceiling hit) -> advance to present
+
+# State key holding the number of completed Collect rounds. Lives on the shared
+# session so the ceiling survives a restart just like the ledger does.
+ROUND_COUNT_STATE_KEY = "collect_round_count"
+
 # A generous ceiling so a scenario that never terminates fails fast instead of
-# looping forever; the deterministic gate normally escalates well before this.
+# looping forever; the deterministic gate normally routes ``done`` well before
+# this. (Replaces ``LoopAgent.max_iterations``, which the graph no longer has.)
 MAX_ROUNDS = int(os.environ.get("ADDRESS_MAX_ROUNDS", "8"))
 
 
@@ -83,35 +93,48 @@ def _latest_turn(events) -> dict | None:
     return extract_exchange_turn(list(reversed(list(events))))
 
 
-class _SatisfactionGate(BaseAgent):
-    """Deterministic loop gate — the "code decides" half of the Collect loop.
+def _build_gate(max_rounds: int):
+    """Build the deterministic loop-gate node — the "code decides" half of Collect.
 
-    Reads the latest collected ``ExchangeTurn`` from the shared session, records
-    it (and the exchange ``context_id``) to state so it survives a restart and so
-    the send-path interceptor threads the same exchange across rounds, then calls
-    the authoritative :func:`is_satisfied` and **escalates** (ends the loop) iff
-    the collection is done. A model is never consulted; the verdict is a pure
-    function of the ledger.
+    The gate reads the latest collected ``ExchangeTurn`` from the shared session,
+    records it (and the exchange ``context_id``) to state so it survives a restart
+    and so the send-path interceptor threads the same exchange across rounds, then
+    calls the authoritative :func:`is_satisfied` and sets ``ctx.route`` to loop
+    back (:data:`ROUTE_AGAIN`) or advance (:data:`ROUTE_DONE`). A model is never
+    consulted; the route is a pure function of the ledger. A round counter forces
+    :data:`ROUTE_DONE` at ``max_rounds`` so a non-terminating scenario cannot loop
+    forever (the ``LoopAgent.max_iterations`` ceiling, re-expressed for the graph).
     """
 
-    async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
+    async def _gate(ctx: Context) -> None:
         turn = _latest_turn(ctx.session.events)
         done = is_satisfied(_coerce_status(turn or {})).done
 
-        state_delta: dict[str, object] = {}
         if turn is not None:
             # Record the collected turn (parity with check_completeness's contract
             # and the durable state the restart proof asserts survives) and thread
             # the exchange context so the next round continues the same A2A
             # exchange rather than opening a fresh one.
-            state_delta[COLLECTION_STATUS_STATE_KEY] = turn
+            ctx.state[COLLECTION_STATUS_STATE_KEY] = turn
             if turn.get("context_id"):
-                state_delta[EXCHANGE_CONTEXT_STATE_KEY] = turn["context_id"]
+                ctx.state[EXCHANGE_CONTEXT_STATE_KEY] = turn["context_id"]
 
-        yield Event(
-            author=self.name,
-            actions=EventActions(escalate=done, state_delta=state_delta),
-        )
+        rounds = int(ctx.state.get(ROUND_COUNT_STATE_KEY, 0)) + 1
+        ctx.state[ROUND_COUNT_STATE_KEY] = rounds
+
+        ctx.route = ROUTE_DONE if (done or rounds >= max_rounds) else ROUTE_AGAIN
+
+    return node(_gate, name=GATE_NODE_NAME)
+
+
+async def _present(ctx: Context) -> dict | None:
+    """Terminal node: expose the collected terminal ``ExchangeTurn`` as output.
+
+    Deterministic by design — the routing decision already happened in the gate
+    ("LLM routes, code decides"). Swap an ``LlmAgent`` in here for a
+    natural-language summary of the terminal turn without touching the loop.
+    """
+    return ctx.state.get(COLLECTION_STATUS_STATE_KEY)
 
 
 def build_address_graph(
@@ -119,7 +142,7 @@ def build_address_graph(
     *,
     model: str | BaseLlm = DEFAULT_MODEL,
     max_rounds: int = MAX_ROUNDS,
-) -> LoopAgent:
+) -> Workflow:
     """Build the durable Collect-loop graph consuming the Bridge (S1-6).
 
     Args:
@@ -127,30 +150,44 @@ def build_address_graph(
             local->GCP swap point; defaults to the environment
             (``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``), mirroring
             :func:`agent.build_address_agent`.
-        model: Unused by the deterministic loop today (the gate is code, not a
-            model); accepted for signature parity with ``build_address_agent`` so
-            a future LLM presenter can be attached without changing callers.
-        max_rounds: Loop ceiling (``LoopAgent.max_iterations``).
+        model: Unused by the deterministic loop today (the gate is code and the
+            presenter is code); accepted for signature parity with
+            ``build_address_agent`` so an ``LlmAgent`` presenter can be attached
+            without changing callers.
+        max_rounds: Loop ceiling enforced by the deterministic gate.
 
     Returns:
-        A ``LoopAgent`` whose sub-agents are the ``RemoteA2aAgent`` collect node
-        and the deterministic :class:`_SatisfactionGate`, to be run on **one
+        A ``Workflow`` graph whose nodes are the ``RemoteA2aAgent`` collect node,
+        the deterministic gate, and a terminal present node, to be run on **one
         shared, durable session**.
     """
-    del model  # reserved for a future presenter; the gate is deterministic code.
+    del model  # reserved for a future presenter; the gate/presenter are code.
     card_url = bridge_card_url or _default_card_url()
-    collect = build_bridge_remote_agent(
-        card_url,
-        name=COLLECT_NODE_NAME,
-        collect_request=CollectRequest(party=PARTY, skill=SKILL),
-    )
-    gate = _SatisfactionGate(name=GATE_NODE_NAME)
 
-    return LoopAgent(
+    # rerun_on_resume=True: a parked collect leg resumes mid-flight (re-run with
+    # the resolved FunctionResponse) rather than being fast-forwarded on resume.
+    collect = node(
+        build_bridge_remote_agent(
+            card_url,
+            name=COLLECT_NODE_NAME,
+            collect_request=CollectRequest(party=PARTY, skill=SKILL),
+        ),
+        name=COLLECT_NODE_NAME,
+        rerun_on_resume=True,
+    )
+    gate = _build_gate(max_rounds)
+    present = node(_present, name=PRESENT_NODE_NAME)
+
+    return Workflow(
         name=GRAPH_NAME,
         description="Durable address-proof Collect loop (S1-6).",
-        sub_agents=[collect, gate],
-        max_iterations=max_rounds,
+        edges=[
+            Edge(from_node=START, to_node=collect),
+            Edge(from_node=collect, to_node=gate),
+            # The conditional loop-back edge: not-done re-enters the collect node.
+            Edge(from_node=gate, to_node=collect, route=ROUTE_AGAIN),
+            Edge(from_node=gate, to_node=present, route=ROUTE_DONE),
+        ],
     )
 
 

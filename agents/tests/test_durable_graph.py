@@ -3,9 +3,10 @@
 Exercises the native, durable Collect-loop graph (``agents.address.graph``) that
 retires the in-turn ``BridgeAgentTool`` (ADR-0010). Three layers:
 
-- **5.1 spike gate 1** — the ``RemoteA2aAgent`` collect node runs as a sub-agent
-  of the loop and the deterministic gate reads its collected ``ExchangeTurn`` off
-  the shared session; an instant-terminal scenario escalates to done.
+- **5.1 spike gate 1** — the ``RemoteA2aAgent`` collect node runs directly as a
+  ``Workflow`` graph node and the deterministic gate reads its collected
+  ``ExchangeTurn`` off the shared session; an instant-terminal scenario routes to
+  done.
 - **5.2 spike gate 2 + loop iteration** — a parked (``input-required``) leg
   *pauses inside the loop* on a ``LongRunningFunctionTool`` call and *resumes*
   via a ``FunctionResponse`` (no HTTP) to the terminal outcome, and the
@@ -17,9 +18,18 @@ retires the in-turn ``BridgeAgentTool`` (ADR-0010). Three layers:
   ``custom_metadata``) are intact, and resume continues the deterministic gate to
   the same terminal outcome as an uninterrupted run — terminal-outcome parity.
 
-Construct note: the graph uses ``LoopAgent`` (ADR-0010 §8 fallback), because a
-``Workflow`` conditional loop-back edge cannot re-enter a node that already
-completed in the invocation. See ``graph.py`` / ADR-0012.
+Construct note: the Collect loop is a native ``google.adk.workflow.Workflow``
+conditional cycle (``collect -> gate``, ``gate --[again]--> collect``, ``gate
+--[done]--> present``) — *not* the deprecated ``LoopAgent``. A conditional
+loop-back edge **does** re-enter and re-run the completed collect node (the graph
+validator requires loop-back edges to be routed; the scheduler re-runs a
+re-triggered COMPLETED node). The one Workflow-specific wrinkle is that
+``RemoteA2aAgent``'s built-in resume detection assumes the resolved
+``FunctionResponse`` is the *last* session event, which the graph orchestrator
+breaks by appending a workflow event after it; the send-path interceptor
+(``bridge_client.remote_consumer``) re-detects the pending resume and stamps the
+parked A2A ``task_id``/``context_id`` so gate 2/5.3 resume the *same* task. See
+``graph.py`` / ADR-0010 / ADR-0012 and docs/lessons-learned A12.
 
 Seams touched (both local-only via SQLite; the GCP adapters are Sprint 2):
 **Sessions** (``InMemorySessionService`` -> ``DatabaseSessionService``) and
@@ -33,6 +43,7 @@ from a2a.server.tasks import DatabaseTaskStore
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService, InMemorySessionService
+from google.adk.workflow import Workflow
 from google.genai import types
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -323,9 +334,21 @@ def test_headline_durable_park_resume_across_restart(tmp_path):
 
 
 def test_build_address_graph_shape():
-    """The graph is a two-node Collect loop (collect node + deterministic gate)."""
+    """The graph is a Workflow conditional cycle, not a LoopAgent.
+
+    Asserts the edge topology that makes it a durable loop: ``collect -> gate``,
+    the conditional ``gate --[again]--> collect`` loop-back edge (the thing a
+    ``LoopAgent`` cannot express and the misdiagnosis claimed a ``Workflow``
+    could not either), and ``gate --[done]--> present``.
+    """
     graph = build_address_graph("http://example.invalid/card.json")
-    assert [sub.name for sub in graph.sub_agents] == [
-        "document_bridge",
-        "satisfaction_gate",
-    ]
+    assert isinstance(graph, Workflow)
+    assert not hasattr(graph, "sub_agents"), "a Workflow graph has edges, not sub_agents"
+
+    edges = {(edge.from_node.name, edge.to_node.name, edge.route) for edge in graph.edges}
+    assert edges == {
+        ("__START__", "document_bridge", None),
+        ("document_bridge", "satisfaction_gate", None),
+        ("satisfaction_gate", "document_bridge", "again"),  # conditional loop-back
+        ("satisfaction_gate", "present", "done"),
+    }

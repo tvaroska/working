@@ -21,7 +21,7 @@ not different agent code.
 
 import httpx
 from google.adk.a2a.agent.config import A2aRemoteAgentConfig, RequestInterceptor
-from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
+from google.adk.agents.remote_a2a_agent import A2A_METADATA_PREFIX, RemoteA2aAgent
 
 from contract import CollectRequest
 
@@ -30,11 +30,71 @@ from .wire import request_to_message
 
 DEFAULT_CONSUMER_NAME = "document_bridge"
 
+_A2A_TASK_ID_META = A2A_METADATA_PREFIX + "task_id"
+_A2A_CONTEXT_ID_META = A2A_METADATA_PREFIX + "context_id"
+
+
+def _pending_resume_target(events, consumer_name: str) -> tuple[str, str | None] | None:
+    """Detect a pending park/resume and return the parked ``(task_id, context_id)``.
+
+    ``RemoteA2aAgent`` detects a resume with ``ctx.session.events[-1].author ==
+    "user"`` (``_create_a2a_request_for_user_function_response``): the resolved
+    ``FunctionResponse`` must be the *last* session event. That holds in a plain
+    agent / ``LoopAgent`` run, but **not inside a ``Workflow``** — the graph
+    orchestrator appends a workflow-start event (author = the graph name) after
+    the user ``FunctionResponse`` and before the collect node re-runs, so the
+    remote agent never sets the parked ``task_id`` and re-sends a *fresh*
+    ``CollectRequest`` (the peer opens a new task and parks again). This helper is
+    the Workflow-ordering-independent equivalent (docs/lessons-learned A12).
+
+    A resume is pending when the most-recent user ``FunctionResponse`` has **no
+    event authored by the collect node after it** — i.e. the collect node has not
+    run since the resolved response was appended (the intervening events are the
+    workflow's own orchestration events, not the consumer's). Once the resumed
+    send completes, the collect node emits its own (``consumer_name``-authored)
+    response events, so on any later fresh round the guard sees a consumer event
+    after the response and correctly does *not* re-fire. The parked identifiers
+    come from the matching function-call event's ``custom_metadata`` — the same
+    ``a2a:task_id`` / ``a2a:context_id`` the SDK reads on the happy path.
+
+    Returns ``(task_id, context_id)`` for the pending resume, or ``None``.
+    """
+    events = list(events)
+    # Most-recent user FunctionResponse and its position.
+    fr_index = None
+    fr_id = None
+    for i in range(len(events) - 1, -1, -1):
+        responses = events[i].get_function_responses()
+        if responses:
+            fr_index = i
+            fr_id = responses[0].id
+            break
+    if fr_index is None or fr_id is None:
+        return None
+
+    # Guard against double-fire: if the collect node already ran since that
+    # response (emitted its own event), this is a later fresh round, not a resume.
+    for later in events[fr_index + 1 :]:
+        if later.author == consumer_name:
+            return None
+
+    # Find the parked function-call event carrying the peer's A2A task id.
+    for event in reversed(events[:fr_index]):
+        if any(fc.id == fr_id for fc in event.get_function_calls()):
+            metadata = event.custom_metadata or {}
+            task_id = metadata.get(_A2A_TASK_ID_META)
+            if isinstance(task_id, str) and task_id:
+                context_id = metadata.get(_A2A_CONTEXT_ID_META)
+                return task_id, context_id if isinstance(context_id, str) else None
+            return None
+    return None
+
 
 def build_collect_request_interceptor(
     collect_request: CollectRequest,
     *,
     context_state_key: str = EXCHANGE_CONTEXT_STATE_KEY,
+    consumer_name: str = DEFAULT_CONSUMER_NAME,
 ) -> RequestInterceptor:
     """Build a send-path interceptor that injects the structured ``CollectRequest``.
 
@@ -47,15 +107,20 @@ def build_collect_request_interceptor(
     Durable exchange context (S1-4): a fresh child session per ``AgentTool`` call
     wipes ``RemoteA2aAgent``'s own context-id history, so the multi-turn Collect
     loop threads the exchange ``context_id`` through **session state** instead
-    (``BridgeAgentTool`` writes it under ``context_state_key`` after each round).
+    (the gate writes it under ``context_state_key`` after each round).
     On a fresh send this interceptor stamps the threaded context id on the outbound
     ``message/send`` so every round continues the **same** A2A exchange — no fresh
     context per round. Precedence: threaded state > the request's own context id.
 
-    The interceptor is a no-op on a **resume** request: those carry a truthy
-    ``task_id`` (built by ``_create_a2a_request_for_user_function_response``) and
-    must keep their resume ack, not be rewritten into a fresh ``CollectRequest``.
-    This protects the park/resume path.
+    Park/resume inside a ``Workflow`` (S1-6): ``RemoteA2aAgent`` builds its own
+    resume request (truthy ``task_id``) only when the resolved ``FunctionResponse``
+    is the *last* session event — which the graph orchestrator breaks by appending
+    a workflow event after it (see :func:`_pending_resume_target`). So this
+    interceptor also detects the pending resume itself and stamps the parked
+    ``task_id`` / ``context_id`` on the outbound message instead of rewriting it
+    into a fresh ``CollectRequest``; that keeps the resume on the **same** A2A task
+    rather than opening (and re-parking) a new one. A request that already carries
+    a ``task_id`` (the SDK did detect the resume) is passed through unchanged.
 
     Note: ``a2a-sdk`` 1.x messages are protobuf — build/read with kwargs /
     ``.field`` (``task_id`` has no field presence, so a truthiness check is the
@@ -63,12 +128,26 @@ def build_collect_request_interceptor(
     """
 
     async def _before_request(ctx, a2a_request, params):
-        # Resume request (has a task_id): pass through unchanged.
+        # Resume request the SDK already recognised (truthy task_id): pass through.
         if a2a_request.task_id:
             return a2a_request, params
+
+        # Resume the SDK missed under Workflow event ordering: stamp the parked
+        # task/context onto this message so the peer resumes the same A2A task.
+        # ``events`` is absent in hermetic interceptor unit tests (ctx may be None).
+        events = getattr(ctx.session, "events", None) if ctx and ctx.session else None
+        if events:
+            resume = _pending_resume_target(events, consumer_name)
+            if resume is not None:
+                task_id, context_id = resume
+                a2a_request.task_id = task_id
+                if context_id:
+                    a2a_request.context_id = context_id
+                return a2a_request, params
+
         # Fresh send: replace the parts with the structured CollectRequest.
         msg = request_to_message(collect_request)
-        # Thread the exchange context from session state (the only cross-AgentTool
+        # Thread the exchange context from session state (the only cross-round
         # channel) so the loop stays on one exchange; fall back to the request's
         # own context id (empty on a first turn). ``ctx`` may be None in hermetic
         # interceptor unit tests.
@@ -119,7 +198,9 @@ def build_bridge_remote_agent(
         config = A2aRemoteAgentConfig(
             request_interceptors=[
                 build_collect_request_interceptor(
-                    collect_request, context_state_key=context_state_key
+                    collect_request,
+                    context_state_key=context_state_key,
+                    consumer_name=name,
                 )
             ]
         )
