@@ -1,0 +1,10 @@
+# Per-item requirement templates (the app-owned "what's needed" labels).
+requirement:
+  item: "proof of address"
+  doctype_hint: gov-id
+# reason_code -> human message. Bridge relays these VERBATIM (ADR-0013). Static strings only.
+reasons:
+  proof-required: "Send a government-issued photo ID, or two utility bills from two different providers."
+  distinct-issuer-needed: "We have one utility bill on file. Send a second bill from a different provider, or a government-issued photo ID."
+  unsupported-doctype: "That document is not an accepted proof of address for this program. Send a driver's licence / state ID, or a utility bill."
+  illegible: "This document was too blurry to read. Please resend a clearer copy."

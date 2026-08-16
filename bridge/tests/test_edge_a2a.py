@@ -31,11 +31,16 @@ from a2a.helpers.proto_helpers import (
     new_text_message,
 )
 from a2a.types import GetTaskRequest, Role, SendMessageRequest, TaskState
-from contract import CollectRequest, Disposition, ExchangeTurn
+from contract import CollectRequest, Disposition, ExchangeTurn, RequirementsList
 
 from bridge.edges.a2a.app import create_app
 from bridge.edges.a2a.executor import BridgeExecutor, _status_for
-from bridge.edges.a2a.plan import GOV_ID_INSTANT, TWO_BILLS_DISTINCT, plan_for_skill
+from bridge.edges.a2a.plan import (
+    GOV_ID_INSTANT,
+    REJECT_RESUBMIT,
+    TWO_BILLS_DISTINCT,
+    plan_for_skill,
+)
 from bridge.edges.a2a.trust import TrustBoundaryError, authorize_leg
 
 PARTY = "jordan-lee"
@@ -343,3 +348,95 @@ async def test_edge_strict_rejects_mismatched_caller():
     )
     with pytest.raises(TrustBoundaryError):
         await executor.execute(context, queue)
+
+
+# --------------------------------------------------------------------------- #
+# 7 — M1.9: Requirements + explanation relay (dual-part artifact + reason_code/message)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.seam("extraction")
+@pytest.mark.seam("skill_registry")
+@pytest.mark.anyio
+async def test_dual_part_artifact_with_requirements_list():
+    """M1.9: artifact carries TWO data parts (ExchangeTurn first, RequirementsList second).
+
+    Asserts:
+    - The artifact has 2 data parts
+    - datas[0] is a valid ExchangeTurn (backward compat for existing decoders)
+    - datas[1] is a valid RequirementsList
+    - A parked round emitting a rejected doc yields a LedgerEntry with reason_code + message
+    - The RequirementsList has done=False for a parked/incomplete collection
+    """
+    app = create_app(base_url=BASE_URL, hold_seconds=0.02, collect_plan=REJECT_RESUBMIT)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE_URL) as hx:
+        card = await A2ACardResolver(hx, BASE_URL).get_agent_card()
+        client = ClientFactory(ClientConfig(httpx_client=hx, streaming=False, polling=True)).create(
+            card
+        )
+
+        msg = _request_message(CollectRequest(party=PARTY, skill=SKILL))
+        task = None
+        async for resp in client.send_message(SendMessageRequest(message=msg)):
+            task = resp.task
+            break
+        task, _ = await _poll(client, task, TaskState.TASK_STATE_INPUT_REQUIRED)
+
+    # Verify dual-part artifact
+    assert task.artifacts, "task must carry artifacts"
+    datas = get_data_parts(task.artifacts[-1].parts)
+    assert len(datas) == 2, "artifact must have 2 data parts (ExchangeTurn + RequirementsList)"
+
+    # Part 0: ExchangeTurn (backward compat — existing decoders rely on datas[0])
+    turn = ExchangeTurn.model_validate(datas[0])
+    assert turn.context_id
+    assert turn.status.terminal is False
+    assert len(turn.status.ledger) == 1
+
+    # Part 1: RequirementsList
+    req_list = RequirementsList.model_validate(datas[1])
+    assert req_list.done is False
+    assert len(req_list.requirements) == 1
+    req = req_list.requirements[0]
+    assert req.item == "proof of address"
+    assert req.reason_code is not None
+    assert req.message is not None
+
+    # Verify rejected entry carries reason_code + message (verbatim relay)
+    entry = turn.status.ledger[0]
+    assert entry.id == "bill-aquautil-blurry"
+    assert entry.disposition == Disposition.REJECTED
+    assert entry.reason_code == "illegible"
+    assert entry.message == "This document was too blurry to read. Please resend a clearer copy."
+
+
+@pytest.mark.seam("extraction")
+@pytest.mark.anyio
+async def test_existing_decoders_still_work():
+    """M1.9 regression guard: existing _turn_from_task decoder still picks ExchangeTurn correctly.
+
+    The plan requires ExchangeTurn part to be emitted FIRST so existing M1.8 decoders
+    keep working unchanged. Verify _turn_from_task (uses datas[0]) still extracts the
+    turn cleanly with two parts present.
+    """
+    app = create_app(base_url=BASE_URL, hold_seconds=0.0, collect_plan=GOV_ID_INSTANT)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE_URL) as hx:
+        card = await A2ACardResolver(hx, BASE_URL).get_agent_card()
+        client = ClientFactory(ClientConfig(httpx_client=hx, streaming=False, polling=True)).create(
+            card
+        )
+
+        msg = _request_message(CollectRequest(party=PARTY, skill=SKILL))
+        task = None
+        async for resp in client.send_message(SendMessageRequest(message=msg)):
+            task = resp.task
+            break
+        task, _ = await _poll(client, task, TaskState.TASK_STATE_COMPLETED)
+
+    # Existing decoder still works
+    turn = _turn_from_task(task)
+    assert turn.context_id
+    assert turn.status.terminal is True
+    assert len(turn.status.ledger) == 1
+    assert turn.status.ledger[0].id == "gov-id-clean"
+    assert turn.status.ledger[0].disposition == Disposition.ACCEPTED

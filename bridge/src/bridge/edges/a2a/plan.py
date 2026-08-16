@@ -40,13 +40,10 @@ class CollectRound:
         fixture_ids: The eval fixture ids that "arrived" this round (fed to the
             extraction engine + M1.6 ``classify_document``).
         terminal: Whether this round ends the exchange.
-        outstanding: Advisory outstanding doctype refs when not terminal (M1.9 owns
-            the real advisory; this is a fixture stand-in).
     """
 
     fixture_ids: tuple[str, ...]
     terminal: bool
-    outstanding: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -54,7 +51,8 @@ class CollectPlan:
     """A scripted sequence of collect rounds (M1.8 fixture stand-in).
 
     Round index clamps to the final round so an extra poll never regresses (parity with
-    the mock's ``step_for_round`` clamp).
+    the mock's ``step_for_round`` clamp). M1.9 owns outstanding computation from the
+    real satisfaction rule; this plan only scripts which documents arrive when.
     """
 
     rounds: tuple[CollectRound, ...]
@@ -69,20 +67,16 @@ class CollectPlan:
         """Whether the round at ``index`` is terminal (clamped)."""
         return self.round_for(index).terminal
 
-    def outstanding(self, index: int) -> tuple[str, ...]:
-        """Advisory outstanding refs for the round at ``index`` (clamped)."""
-        return self.round_for(index).outstanding
-
 
 # One round, an accepted gov-id → the app's sense-B rule is satisfied instantly.
 GOV_ID_INSTANT = CollectPlan((CollectRound(("gov-id-clean",), terminal=True),))
 
-# Round 0: one Power Co. bill, non-terminal, outstanding a second bill. Round 1: a
-# distinct-issuer (aqua-util) bill → the app's count-to-two distinct-issuer rule is
-# satisfied. Drives the park (INPUT_REQUIRED) → resume → COMPLETED path.
+# Round 0: one Power Co. bill, non-terminal. Round 1: a distinct-issuer (aqua-util) bill
+# → the app's count-to-two distinct-issuer rule is satisfied. Drives the park
+# (INPUT_REQUIRED) → resume → COMPLETED path.
 TWO_BILLS_DISTINCT = CollectPlan(
     (
-        CollectRound(("bill-powerco-clean",), terminal=False, outstanding=("utility-bill",)),
+        CollectRound(("bill-powerco-clean",), terminal=False),
         CollectRound(("bill-aquautil-clean",), terminal=True),
     )
 )
@@ -94,7 +88,7 @@ TWO_BILLS_DISTINCT = CollectPlan(
 # about consumer round structure.
 REJECT_RESUBMIT = CollectPlan(
     (
-        CollectRound(("bill-aquautil-blurry",), terminal=False, outstanding=("utility-bill",)),
+        CollectRound(("bill-aquautil-blurry",), terminal=False),
         CollectRound(("gov-id-clean",), terminal=True),
     )
 )

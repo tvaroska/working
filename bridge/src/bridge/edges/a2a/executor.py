@@ -39,9 +39,17 @@ from a2a.types import Task, TaskState, TaskStatus
 from contract import CollectRequest, Disposition
 
 from bridge.adapters.local.extraction import FixtureDocument
+from bridge.adapters.local.skill_registry import LocalSkillRegistry
 from bridge.aggregate import create_leg_task, next_ordinal
 from bridge.disposition import classify_document
 from bridge.ledger import build_exchange_turn, ledger_entry_of, stamp_ledger_entry
+from bridge.requirements import (
+    SkillExplanations,
+    advisory_satisfaction,
+    explain_rejection,
+    load_explanations,
+    propose_requirements,
+)
 from bridge.seams.extraction import ExtractionSeam
 from bridge.skills import DispositionThresholds
 
@@ -78,6 +86,7 @@ class BridgeExecutor(AgentExecutor):
         engine: ExtractionSeam,
         collect_plan: CollectPlan | None = None,
         thresholds: DispositionThresholds | None = None,
+        explanations: SkillExplanations | None = None,
         strict: bool = False,
         hold_seconds: float = 0.0,
     ) -> None:
@@ -90,6 +99,8 @@ class BridgeExecutor(AgentExecutor):
                 (:func:`~bridge.edges.a2a.plan.plan_for_skill`).
             thresholds: Disposition thresholds. Defaults to ``DispositionThresholds()``
                 (0.55/0.85 — ADR-0002).
+            explanations: Skill explanations for requirements relay (M1.9). When None,
+                lazily resolved from the address-proof skill via LocalSkillRegistry.
             strict: Trust boundary mode (A6). Permissive by default.
             hold_seconds: Progress hold before completing (shrinkable for tests; the
                 real edge defaults to 0.0 — the mock's ~10s hold was an M0 demonstrator).
@@ -99,6 +110,18 @@ class BridgeExecutor(AgentExecutor):
         self._thresholds = thresholds or DispositionThresholds()
         self._strict = strict
         self._hold_seconds = hold_seconds
+
+        # Explanations: lazily resolve if None (so direct-executor tests keep working).
+        if explanations is None:
+            registry = LocalSkillRegistry()
+            # Synchronous access via the _skills dict (populated in __init__)
+            skill = registry._skills.get("address-proof")
+            if skill is not None:
+                self._explanations = load_explanations(skill)
+            else:
+                self._explanations = SkillExplanations()
+        else:
+            self._explanations = explanations
 
         # Per-context state.
         self._rounds: dict[str, int] = {}
@@ -192,7 +215,13 @@ class BridgeExecutor(AgentExecutor):
         legs = self._tasks.setdefault(ctx, [])
         for fid in collect_round.fixture_ids:
             extraction = await self._engine.extract(FixtureDocument(fixture_id=fid), None)
-            entry, _result = classify_document(fid, extraction, thresholds=self._thresholds)
+            entry, result = classify_document(fid, extraction, thresholds=self._thresholds)
+
+            # M1.9: stamp rejected entries with reason_code + message (verbatim relay)
+            if entry.disposition == Disposition.REJECTED:
+                code, msg = explain_rejection(entry, result.gate, explanations=self._explanations)
+                entry = entry.model_copy(update={"reason_code": code, "message": msg})
+
             leg = create_leg_task(
                 context_id=ctx,
                 ordinal=next_ordinal(legs),
@@ -202,7 +231,6 @@ class BridgeExecutor(AgentExecutor):
             legs.append(leg)
 
         terminal = plan.is_terminal(r)
-        outstanding = plan.outstanding(r)
 
         # Non-empty progress before the artifact (A11).
         collected = len(legs)
@@ -214,10 +242,28 @@ class BridgeExecutor(AgentExecutor):
         overall = self._overall_disposition(legs, terminal=terminal)
         next_state = _status_for(overall)
 
-        # Emit the ExchangeTurn (the whole exchange's ledger) as a terminal artifact
-        # (last_chunk=True even when parking — A12).
-        turn = build_exchange_turn(ctx, legs, outstanding=list(outstanding), terminal=terminal)
-        await updater.add_artifact([new_data_part(turn.model_dump(mode="json"))], last_chunk=True)
+        # M1.9: compute advisory satisfaction and build the turn with the real outstanding.
+        # Build a preliminary turn to get the status with the ledger (for advisory input).
+        prelim_turn = build_exchange_turn(ctx, legs, outstanding=[], terminal=terminal)
+        advisory = advisory_satisfaction(prelim_turn.status)
+
+        # Rebuild the turn with the advisory outstanding.
+        # NOTE: terminal flag stays plan-driven (not rewired to advisory.done) to avoid
+        # perturbing M1.8's park/resume tests and _overall_disposition's PENDING-leg handling.
+        turn = build_exchange_turn(ctx, legs, outstanding=advisory.outstanding, terminal=terminal)
+
+        # M1.9: build the RequirementsList from the advisory + explanations.
+        requirements = propose_requirements(turn.status, explanations=self._explanations)
+
+        # M1.9: emit BOTH ExchangeTurn and RequirementsList in one artifact (two data parts).
+        # ExchangeTurn part FIRST (critical: existing M1.8 decoders rely on datas[0]).
+        await updater.add_artifact(
+            [
+                new_data_part(turn.model_dump(mode="json")),
+                new_data_part(requirements.model_dump(mode="json")),
+            ],
+            last_chunk=True,
+        )
 
         if next_state == TaskState.TASK_STATE_INPUT_REQUIRED:
             await updater.update_status(

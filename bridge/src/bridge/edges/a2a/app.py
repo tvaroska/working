@@ -24,6 +24,7 @@ from starlette.applications import Starlette
 
 from bridge.adapters.local.extraction import FixtureExtractionEngine
 from bridge.adapters.local.skill_registry import LocalSkillRegistry
+from bridge.requirements import load_explanations
 from bridge.seams.extraction import ExtractionSeam
 
 from .executor import BridgeExecutor
@@ -103,9 +104,14 @@ def create_app(
         "BRIDGE_SKILLS_DIR / the skills/ tree)."
     )
 
+    # M1.9: resolve explanations from the address-proof skill for requirements relay.
+    skill = registry._skills.get("address-proof")
+    explanations = load_explanations(skill) if skill is not None else None
+
     executor = BridgeExecutor(
         engine=engine,
         collect_plan=collect_plan,
+        explanations=explanations,
         strict=strict,
         hold_seconds=hold_seconds,
     )

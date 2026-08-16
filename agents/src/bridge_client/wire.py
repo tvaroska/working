@@ -23,8 +23,7 @@ import json
 
 from a2a.helpers.proto_helpers import get_data_parts, new_data_message
 from a2a.types import Message, Role, Task
-
-from contract import CollectRequest, ExchangeTurn
+from contract import CollectRequest, ExchangeTurn, RequirementsList
 
 _A2A_START = b"<a2a_datapart_json>"
 _A2A_END = b"</a2a_datapart_json>"
@@ -50,6 +49,12 @@ def task_to_exchange_turn(task: Task) -> ExchangeTurn:
     Raises :class:`BridgeWireError` if there is no artifact with a data part.
     Backfills an empty ``context_id`` from ``task.context_id`` (A2A's
     authoritative context id).
+
+    Notes:
+        M1.9: hardened to select by shape (presence of "status" key) for defensiveness,
+        as the artifact now carries two data parts (ExchangeTurn + RequirementsList).
+        The ExchangeTurn part is emitted first, so datas[0] is still correct, but
+        shape-based selection is more robust.
     """
     if not task.artifacts:
         raise BridgeWireError("completed task carried no artifacts")
@@ -58,7 +63,18 @@ def task_to_exchange_turn(task: Task) -> ExchangeTurn:
     if not datas:
         raise BridgeWireError("completed task artifact carried no data part")
 
-    turn = ExchangeTurn.model_validate(datas[0])
+    # Select the ExchangeTurn by shape (has "status" key)
+    turn_data = None
+    for data in datas:
+        if isinstance(data, dict) and "status" in data:
+            turn_data = data
+            break
+
+    if turn_data is None:
+        # Fallback to datas[0] for backward compatibility
+        turn_data = datas[0]
+
+    turn = ExchangeTurn.model_validate(turn_data)
     if not turn.context_id:
         turn = turn.model_copy(update={"context_id": task.context_id})
     return turn
@@ -105,3 +121,62 @@ def latest_exchange_turn(events) -> dict | None:
     the durability tests).
     """
     return extract_exchange_turn(list(reversed(list(events))))
+
+
+def requirements_from_task(task: Task) -> RequirementsList | None:
+    """Decode the ``RequirementsList`` carried in a completed task's first artifact (M1.9).
+
+    Selects the data part whose dict has a top-level ``requirements`` key (shape-based).
+    Returns None if no matching part is found.
+
+    Args:
+        task: The completed Task.
+
+    Returns:
+        A RequirementsList instance, or None if not present.
+    """
+    if not task.artifacts:
+        return None
+
+    datas = get_data_parts(task.artifacts[0].parts)
+    if not datas:
+        return None
+
+    # Select the RequirementsList by shape (has "requirements" key)
+    for data in datas:
+        if isinstance(data, dict) and "requirements" in data:
+            return RequirementsList.model_validate(data)
+
+    return None
+
+
+def latest_requirements_list(events) -> dict | None:
+    """Scan an ADK event stream for the Bridge's ``RequirementsList`` DataPart (M1.9).
+
+    Mirrors :func:`extract_exchange_turn` but selects the data part whose dict has a
+    top-level ``requirements`` key (shape-based). Returns the first matching dict, or
+    None if none is present.
+
+    Args:
+        events: The ADK event stream.
+
+    Returns:
+        The RequirementsList dict, or None.
+    """
+    for event in events:
+        if not (event.content and event.content.parts):
+            continue
+        for part in event.content.parts:
+            blob = getattr(part, "inline_data", None)
+            if blob is None or not blob.data:
+                continue
+            raw = blob.data
+            if _A2A_START in raw and _A2A_END in raw:
+                raw = raw.split(_A2A_START, 1)[1].split(_A2A_END, 1)[0]
+            try:
+                data = json.loads(raw)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(data, dict) and "requirements" in data:
+                return data
+    return None
