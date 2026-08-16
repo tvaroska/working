@@ -13,7 +13,6 @@ import pytest
 
 from bridge.adapters.local import build_local_adapter
 from bridge.adapters.local.extraction import FixtureExtractionEngine
-from bridge.adapters.local.scheduler import LocalScheduler
 from bridge.seams import (
     ALL_SEAMS,
     ExchangeStoreSeam,
@@ -109,21 +108,9 @@ def test_build_local_adapter_unknown_seam_raises():
 #
 # Note: the skill-registry deferral test was removed in M1.3 — LocalSkillRegistry
 # now implements real directory-backed behavior (see tests/test_skill_registry.py).
-
-
-@pytest.mark.anyio
-async def test_scheduler_skeleton_defers():
-    """Verify LocalScheduler skeleton methods raise NotImplementedError."""
-    scheduler = LocalScheduler(clock=None)
-
-    with pytest.raises(NotImplementedError, match="M1.12"):
-        await scheduler.schedule({})
-
-    with pytest.raises(NotImplementedError, match="M1.12"):
-        await scheduler.due(None)
-
-    with pytest.raises(NotImplementedError, match="M1.12"):
-        await scheduler.cancel("test-timer")
+#
+# Note: the scheduler deferral test was removed in M1.12 — LocalScheduler now
+# implements real in-memory timer behavior (see tests/test_scheduler.py).
 
 
 @pytest.mark.anyio

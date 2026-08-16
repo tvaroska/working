@@ -10,8 +10,8 @@ Local adapters:
 - Exchange store: LocalExchangeStore (in-memory, M1.2)
 - Skill registry: LocalSkillRegistry (directory-backed, loads Agent Skills folders +
     builds dynamic Agent Card; BRIDGE_SKILLS_DIR env override, M1.3)
-- Scheduler: LocalScheduler (in-memory + virtual clock, M1.12 fills in behavior)
-- Extraction: FixtureExtractionEngine (deterministic fixtures, M1.7 fills in behavior)
+- Scheduler: LocalScheduler (in-memory + virtual clock, M1.12)
+- Extraction: FixtureExtractionEngine (deterministic fixtures, M1.7)
 
 GCP adapters land in Sprint 2 via a parallel build_gcp_adapter factory.
 """
