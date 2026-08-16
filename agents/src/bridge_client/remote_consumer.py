@@ -25,10 +25,18 @@ from google.adk.agents.remote_a2a_agent import A2A_METADATA_PREFIX, RemoteA2aAge
 
 from contract import CollectRequest
 
-from .bridge_tool import EXCHANGE_CONTEXT_STATE_KEY
 from .wire import request_to_message
 
 DEFAULT_CONSUMER_NAME = "document_bridge"
+
+EXCHANGE_CONTEXT_STATE_KEY = "bridge_exchange_context_id"
+"""Session-state key under which the durable A2A exchange ``context_id`` is threaded.
+
+Bridge-owned (``bridge_client`` imports nothing from ``agents.*``). In the durable
+``Workflow`` graph the gate node writes the collected turn's ``context_id`` here after
+each round; the send-path interceptor below reads it to keep the whole Collect loop on
+one exchange rather than opening a fresh one per round.
+"""
 
 _A2A_TASK_ID_META = A2A_METADATA_PREFIX + "task_id"
 _A2A_CONTEXT_ID_META = A2A_METADATA_PREFIX + "context_id"

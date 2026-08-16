@@ -1,6 +1,13 @@
-# Agents — M0 Contract Tracer Bullet
+# Agents — Address service agent
 
-An address `LlmAgent` asks a mock Document Bridge once and receives back an eval-sourced document over canonical A2A (JSON-RPC 2.0). This is the **input/output design validation** for the Bridge's contract with agent callers. See [Milestone 0](../PLAN.md) and the [M0 spec](../docs/milestone-0-contract-tracer.md).
+The address service agent is a durable ADK `Workflow` graph (ADR-0010): a
+`RemoteA2aAgent` **collect** node → a deterministic Sense-B **gate** node → a
+**present** node, running on one shared, resumable session. It asks a Document
+Bridge to collect an address proof and loops (chase → re-check) until the
+deterministic gate says the requirement is satisfied — "LLM routes, code decides."
+Documents travel over canonical A2A (JSON-RPC 2.0). See [PLAN.md](../PLAN.md),
+[wiki/bridge-service-agent-architecture.md](../wiki/bridge-service-agent-architecture.md),
+and [ADR-0010](../docs/decisions/adr-0010-durable-consumer-construct.md).
 
 ## Prerequisites
 
@@ -18,8 +25,8 @@ agents/
     bridge_client/     Native RemoteA2aAgent Bridge consumer (build_bridge_remote_agent) + pure A2A wire helpers (adr-0009)
     agents/
       mock_bridge/     a2a-sdk mock server (permanent Sprint-1 contract double)
-      address/         Address LlmAgent (Bridge as a BridgeAgentTool call-and-return) + manual driver
-  tests/               Pytest suite; test_round_trip.py is the M0 validation gate
+      address/         Address service agent — durable Workflow graph (graph.py) + config + manual driver
+  tests/               Pytest suite; test_durable_graph.py is the S1-6 validation gate
 ```
 
 ## Run the test
@@ -30,10 +37,10 @@ uv run pytest
 
 **This is the zero-setup path.** The test suite is fully hermetic:
 - It spins up its own mock server on a free port in a daemon thread.
-- It drives the agent with a scripted model stub (`ScriptedTransferModel`), not a real model.
+- The graph is deterministic (code gate + code presenter), so no model is called.
 - It does **not** need a running server, API credentials, or any environment setup.
 
-The round-trip test (`test_round_trip_agent_bridge_agent`) proves the agent calls its `document_bridge` tool (a `BridgeAgentTool` over a native `RemoteA2aAgent`), which collects from the live mock over canonical A2A, and the eval-sourced `ExchangeTurn` (matching `wiki/evals/address/expected.json`) comes back as the tool result. The `message/send` → `Task{WORKING}` → `tasks/get` → `COMPLETED` wire ordering is locked separately by `test_native_consumer.py` Test A.
+`test_durable_graph.py` drives the durable `Workflow` graph end to end against the live mock over canonical A2A — the Collect loop runs, the deterministic gate routes, and the terminal `ExchangeTurn` (matching `wiki/evals/address/expected.json`) lands in session state — and asserts a parked (`input-required`) leg resumes across a fresh Runner pointed at the same session store. The `message/send` → `Task{WORKING}` → `tasks/get` → `COMPLETED` wire ordering is locked separately by `test_native_consumer.py` Test A, and the send-path `CollectRequest` DataPart + durable context threading by `test_interceptor.py`.
 
 ## Start the mock
 
@@ -58,7 +65,9 @@ The default 10s hold exercises the poll path. For a quicker manual run, lower it
 ## Run in the ADK dev UI (`adk web`)
 
 The address agent is a standard ADK agent package — it exposes a module-level
-`root_agent`, so the ADK dev UI can serve it directly:
+`app` (a resumable `App` wrapping the durable graph; the ADK loader picks `app`
+up ahead of `root_agent`), so the ADK dev UI can serve it directly with
+park/resume support:
 
 **Terminal 1** — start the mock Bridge:
 ```bash
@@ -88,12 +97,12 @@ Two-terminal flow (the server and agent must run in separate terminals):
 MOCK_BRIDGE_HOLD_SECONDS=2 uv run python -m agents.mock_bridge
 ```
 
-**Terminal 2** — run the agent (needs credentials):
+**Terminal 2** — run the agent:
 ```bash
 uv run python -m agents.address
 ```
 
-The agent prints the rendered document id (`gov-id-clean`) and its structured fields (name, address, etc.).
+The graph is deterministic today (code gate + code presenter), so this default run makes **no model call and needs no credentials**. It drives the graph for one Collect exchange and prints the terminal `collection_status` (the collected `ExchangeTurn`). Credentials are only needed once an `LlmAgent` presenter is dropped into the graph's present node.
 
 **Environment variables** (all optional):
 - `GOOGLE_CLOUD_PROJECT` — Vertex AI project (required for the real model)
@@ -105,11 +114,13 @@ The agent prints the rendered document id (`gov-id-clean`) and its structured fi
 
 ## Native A2A consumer (adr-0009)
 
-The demos consume the Bridge through ADK's platform-native `RemoteA2aAgent`. `bridge_client.build_bridge_remote_agent(agent_card_url, collect_request=...)` returns a card-configured consumer, wired into the address agent as a **`BridgeAgentTool`** (`document_bridge`, call-and-return) so control returns with the collected `ExchangeTurn` as the tool result (S1-2); the structured `CollectRequest` is injected on the send path by a `RequestInterceptor`. The mock→real / local→GCP swap is a **different Agent Card URL**, not different agent code. The native construct gives progress (`TaskStatusUpdateEvent.status.message`) and **park/resume** (`INPUT_REQUIRED` → `LongRunningFunctionTool` pause → `FunctionResponse` resume) for free. The M0 hand-rolled `BridgeClient` port + poll loop was removed once the wire contract was validated (see the adr-0009 amendment).
+The demos consume the Bridge through ADK's platform-native `RemoteA2aAgent`. `bridge_client.build_bridge_remote_agent(agent_card_url, collect_request=...)` returns a card-configured consumer, run **directly as the collect node** of the durable `Workflow` graph (`BaseAgent` subclasses the workflow `BaseNode`, so no `AgentTool` adapter is needed); the structured `CollectRequest` is injected on the send path by a `RequestInterceptor`. The mock→real / local→GCP swap is a **different Agent Card URL**, not different agent code. The native construct gives progress (`TaskStatusUpdateEvent.status.message`) and **park/resume** (`INPUT_REQUIRED` → `LongRunningFunctionTool` pause → `FunctionResponse` resume) for free.
 
-The address agent now has **two tools** (S1-4 Collect loop): `document_bridge` (the Bridge collect, which writes the returned `ExchangeTurn` to session state under `collection_status`) and `check_completeness` (the authoritative `is_satisfied` gate, which reads that state). The model routes — collect → check the gate → chase the outstanding proof if not done → terminate when done — and the deterministic gate decides "done"; the model can never mint it. One durable exchange **`context_id`** spans the loop's rounds, threaded through session state (`bridge_exchange_context_id`) and stamped on each send by the interceptor; the A2A `task_id` is not reused in the completing path (adr-0009 S1-4 amendment).
+The Collect loop is the graph itself (ADR-0010): collect node → deterministic gate node → present node, on **one shared, resumable session**. The gate reads the latest collected `ExchangeTurn` back from the session, records it to state under `collection_status`, and routes — loop back to collect if not done, advance to present when done. The deterministic gate decides "done"; the model can never mint it ("LLM routes, code decides"). One durable exchange **`context_id`** spans the loop's rounds, threaded through session state (`bridge_exchange_context_id`) and stamped on each send by the interceptor. Because the whole graph runs on one durable session, a parked leg survives a process restart and resumes with no webhook (ADR-0010).
 
-`tests/test_native_consumer.py` covers the wire contract (raw client, Test A) and the `RemoteA2aAgent` pause/resume spike (Test B); `tests/test_round_trip.py` covers the address agent's tool → mock path end to end; `tests/test_control_return.py` locks the send-path `CollectRequest` DataPart (interceptor unit tests + live capture) and control return (S1-2); `tests/test_collect_loop.py` locks the context threading, the live durable-context property, and the gate-routed loop iteration (S1-4). `RemoteA2aAgent` is `@a2a_experimental` (ADK 2.7.0) — pinned via `use_legacy=True` until validated.
+The earlier interim wiring — a `BridgeAgentTool` call-and-return (S1-2) and an `LlmAgent` two-tool Collect loop (S1-4) — was superseded by this graph and lives on only in git history (ADR-0010).
+
+`tests/test_native_consumer.py` covers the wire contract (raw client, Test A) and the `RemoteA2aAgent` pause/resume spike (Test B); `tests/test_interceptor.py` locks the send-path `CollectRequest` DataPart and the durable context threading; `tests/test_durable_graph.py` drives the graph end to end and asserts park/resume across a restart. `RemoteA2aAgent` is `@a2a_experimental` and `ResumabilityConfig` is `@experimental` (ADK 2.7.0, ADR-0012) — tracked in the experimental-surface register.
 
 ## Lint
 
@@ -119,7 +130,8 @@ uv run ruff check
 
 ## See also
 
-- [`../PLAN.md`](../PLAN.md) — active development tracker (Milestone 0)
-- [`../docs/milestone-0-contract-tracer.md`](../docs/milestone-0-contract-tracer.md) — M0 spec
+- [`../PLAN.md`](../PLAN.md) — active development tracker
 - [`../wiki/bridge.md`](../wiki/bridge.md) — root of the design spec
-- [`../wiki/bridge-a2a-consumer.md`](../wiki/bridge-a2a-consumer.md) / [`../docs/decisions/adr-0009-native-a2a-consumer.md`](../docs/decisions/adr-0009-native-a2a-consumer.md) — the native `RemoteA2aAgent` consumer that supersedes this port from Sprint 1
+- [`../wiki/bridge-service-agent-architecture.md`](../wiki/bridge-service-agent-architecture.md) — the durable service-agent graph shape
+- [`../wiki/bridge-a2a-consumer.md`](../wiki/bridge-a2a-consumer.md) / [`../docs/decisions/adr-0009-native-a2a-consumer.md`](../docs/decisions/adr-0009-native-a2a-consumer.md) — the native `RemoteA2aAgent` consumer
+- [`../docs/decisions/adr-0010-durable-consumer-construct.md`](../docs/decisions/adr-0010-durable-consumer-construct.md) — the durable `Workflow` graph that supersedes the interim `AgentTool` wiring

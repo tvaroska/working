@@ -45,12 +45,11 @@ from google.adk.apps import App, ResumabilityConfig
 from google.adk.models import BaseLlm
 from google.adk.workflow import START, Edge, Workflow, node
 
-from bridge_client import build_bridge_remote_agent
-from bridge_client.bridge_tool import EXCHANGE_CONTEXT_STATE_KEY
+from bridge_client import EXCHANGE_CONTEXT_STATE_KEY, build_bridge_remote_agent
 from bridge_client.wire import extract_exchange_turn
 from contract import CollectRequest
 
-from .agent import (
+from .config import (
     APP_NAME,
     DEFAULT_MODEL,
     PARTY,
@@ -148,12 +147,10 @@ def build_address_graph(
     Args:
         bridge_card_url: URL of the Bridge's Agent Card — the single mock->real /
             local->GCP swap point; defaults to the environment
-            (``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``), mirroring
-            :func:`agent.build_address_agent`.
+            (``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``).
         model: Unused by the deterministic loop today (the gate is code and the
-            presenter is code); accepted for signature parity with
-            ``build_address_agent`` so an ``LlmAgent`` presenter can be attached
-            without changing callers.
+            presenter is code); accepted so an ``LlmAgent`` presenter can be
+            attached later without changing callers.
         max_rounds: Loop ceiling enforced by the deterministic gate.
 
     Returns:
@@ -210,3 +207,21 @@ def build_address_app(
         root_agent=build_address_graph(bridge_card_url, model=model, max_rounds=max_rounds),
         resumability_config=ResumabilityConfig(is_resumable=True),
     )
+
+
+root_agent = build_address_graph()
+"""The durable Collect-loop graph, for ADK tooling that wants a bare root agent.
+
+``Workflow`` is a ``BaseNode`` (a valid ADK root); building it here is
+side-effect-free — ``RemoteA2aAgent`` only stores the card URL, so no network call
+happens until a turn runs. Prefer :data:`app` for ``adk web`` / deploy: the ADK
+agent loader picks up a module-level ``App`` before ``root_agent``, and only the
+``App`` path carries ``ResumabilityConfig`` (durable park/resume — A13).
+"""
+
+app = build_address_app()
+"""The resumable ``App`` wrapping the graph — the entry point for ``adk web`` and
+deploy. The ADK agent loader discovers a module-level ``app`` (an ``App``) ahead of
+``root_agent``, so pointing ``adk web`` at this package surfaces the **durable**
+construct (ADR-0010), not a bare graph.
+"""
