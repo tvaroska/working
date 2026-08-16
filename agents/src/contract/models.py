@@ -22,6 +22,20 @@ class Disposition(StrEnum):
     REJECTED = "rejected"
 
 
+class RequirementStatus(StrEnum):
+    """The per-item status vocabulary of the app-owned requirements list.
+
+    The whole "language" of the requirements artifact (wiki/bridge-collect.md):
+    ``required``/``optional`` are the Bridge's mechanical chase knob, while
+    ``satisfied``/``waived`` mark items the app no longer needs chased.
+    """
+
+    REQUIRED = "required"
+    OPTIONAL = "optional"
+    SATISFIED = "satisfied"
+    WAIVED = "waived"
+
+
 class ExtractedFields(BaseModel):
     """The extracted fields from a document.
 
@@ -70,6 +84,16 @@ class LedgerEntry(BaseModel):
     disposition: Disposition
     extraction: Extraction
 
+    # App-authored explanation of *why* this document got its disposition (ADR-0013).
+    # reason_code is a stable machine key minted by the app's deterministic gate
+    # ("code decides" — the Bridge keys idempotent chase on it); message is the
+    # human-facing prose the Bridge relays verbatim over A2UI (a servicing agent's
+    # LLM may author it — "LLM routes" the words, never the verdict). Both are None
+    # for an accepted doc that needs no explanation. reason_code is a free string,
+    # not an enum: the vocabulary is per-skill, so the Bridge stays domain-agnostic.
+    reason_code: str | None = None
+    message: str | None = None
+
 
 class CollectionStatus(BaseModel):
     """The classified ledger container returned to the agent.
@@ -83,6 +107,41 @@ class CollectionStatus(BaseModel):
     ledger: list[LedgerEntry] = Field(default_factory=list)
     outstanding: list[str] = Field(default_factory=list)
     terminal: bool = False
+
+
+class Requirement(BaseModel):
+    """One item in the app-owned requirements list (ADR-0013).
+
+    ``item`` is a human label ("proof of address"); ``status`` tunes the Bridge's
+    mechanical chase; ``doctype_hint`` is a best-effort steer for what to upload.
+    ``reason_code``/``message`` carry the app-authored *why* an item is outstanding
+    (e.g. ``distinct-issuer-needed`` + "Both bills are from Power Co. — send a bill
+    from a different provider."). See :class:`LedgerEntry` for the field split.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    item: str
+    status: RequirementStatus
+    doctype_hint: str | None = None
+    reason_code: str | None = None
+    message: str | None = None
+
+
+class RequirementsList(BaseModel):
+    """The **app-owned** artifact: what's needed, whether it's done, and why (ADR-0013).
+
+    Distinct from the Bridge-owned :class:`CollectionStatus` ("what we have"): the
+    app decides *what's needed* and *is it done*; the Bridge proposes a best-effort
+    list but holds no final word (wiki/bridge-collect.md). Travels inside A2A
+    parts/artifacts alongside :class:`ExchangeTurn`, not nested in CollectionStatus,
+    preserving the two-owner split.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    requirements: list[Requirement] = Field(default_factory=list)
+    done: bool = False
 
 
 class ExchangeTurn(BaseModel):

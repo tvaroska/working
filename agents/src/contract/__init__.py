@@ -8,6 +8,9 @@ from .models import (
     ExtractedFields,
     Extraction,
     LedgerEntry,
+    Requirement,
+    RequirementsList,
+    RequirementStatus,
 )
 
 __all__ = [
@@ -18,4 +21,7 @@ __all__ = [
     "ExtractedFields",
     "ExchangeTurn",
     "LedgerEntry",
+    "Requirement",
+    "RequirementsList",
+    "RequirementStatus",
 ]
