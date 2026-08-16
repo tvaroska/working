@@ -47,7 +47,7 @@ from google.adk.workflow import Workflow
 from google.genai import types
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from agents.address.graph import build_address_app, build_address_graph
+from agents.address.graph import build_address_app
 from agents.address.satisfaction import (
     TERMINAL_TURN_STATE_KEY,
     _coerce_status,
@@ -336,7 +336,7 @@ def test_build_address_graph_shape():
     ``LoopAgent`` cannot express and the misdiagnosis claimed a ``Workflow``
     could not either), and ``gate --[done]--> present``.
     """
-    graph = build_address_graph("http://example.invalid/card.json")
+    graph = build_address_app("http://example.invalid/card.json").root_agent
     assert isinstance(graph, Workflow)
     assert not hasattr(graph, "sub_agents"), "a Workflow graph has edges, not sub_agents"
 

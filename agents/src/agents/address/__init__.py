@@ -6,8 +6,9 @@ session. The module-level :data:`app` (a resumable ``App``) is the ``adk web`` /
 deploy entry point; :data:`root_agent` is the bare graph for tooling that wants one.
 """
 
+from .agent import app, root_agent
 from .config import APP_NAME, PARTY, SKILL
-from .graph import app, build_address_app, build_address_graph, root_agent
+from .graph import build_address_app
 from .satisfaction import (
     TERMINAL_TURN_STATE_KEY,
     SatisfactionResult,
@@ -18,7 +19,6 @@ __all__ = [
     "app",
     "root_agent",
     "build_address_app",
-    "build_address_graph",
     "PARTY",
     "SKILL",
     "APP_NAME",

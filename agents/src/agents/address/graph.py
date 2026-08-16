@@ -119,28 +119,42 @@ async def _present(ctx: Context) -> dict | None:
     return ctx.state.get(TERMINAL_TURN_STATE_KEY)
 
 
-def build_address_graph(
+def build_address_app(
     bridge_card_url: str | None = None,
     *,
     max_rounds: int = MAX_ROUNDS,
-) -> Workflow:
-    """Build the durable Collect-loop graph consuming the Bridge (S1-6).
+) -> App:
+    """Build the durable Collect-loop graph as a resumable ``App`` (S1-6).
+
+    The single factory for the address agent: it constructs the ``Workflow`` graph
+    (``RemoteA2aAgent`` collect node → deterministic gate → present node) inline
+    and wraps it in a resumable ``App``. ``build_address_app(...).root_agent`` is
+    the bare graph for tooling/tests that want one.
 
     Args:
         bridge_card_url: URL of the Bridge's Agent Card — the single mock->real /
-            local->GCP swap point; defaults to the environment
-            (``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``).
+            local->GCP swap point (why this stays a factory rather than a module
+            literal: tests inject a live mock's card URL); defaults to the
+            environment (``BRIDGE_CARD_URL`` / ``BRIDGE_BASE_URL``).
         max_rounds: Loop ceiling enforced by the deterministic gate.
 
     Returns:
-        A ``Workflow`` graph whose nodes are the ``RemoteA2aAgent`` collect node,
-        the deterministic gate, and a terminal present node, to be run on **one
+        A resumable ``App`` wrapping the ``Workflow`` graph, to be run on **one
         shared, durable session**.
 
     The graph is deterministic today (code gate + code presenter), so it makes no
     model call. To add a natural-language summary, drop an ``LlmAgent`` into the
     present node (``_present``); the routing decision stays in the deterministic
     gate ("LLM routes, code decides").
+
+    ``ResumabilityConfig(is_resumable=True)`` is what makes a parked leg resumable
+    across a process restart; it lives on ``App``, so a durable run must go through
+    the ``App`` path (not a bare ``agent=``/``node=`` Runner) — docs/lessons-learned
+    A13. ``ResumabilityConfig`` is ``@experimental`` in ADK 2.7.0 (ADR-0012). This
+    only sets the switch; the *durable stores* — ``DatabaseSessionService``
+    (Sessions seam) and the Bridge's ``DatabaseTaskStore`` (Task-store seam) — are
+    wired at ``Runner`` construction by the caller (the default ``__main__`` driver
+    runs ``InMemory*`` for a single-process demo).
     """
     card_url = bridge_card_url or _default_card_url()
 
@@ -158,7 +172,7 @@ def build_address_graph(
     gate = _build_gate(max_rounds)
     present = node(_present, name=PRESENT_NODE_NAME)
 
-    return Workflow(
+    graph = Workflow(
         name=GRAPH_NAME,
         description="Durable address-proof Collect loop (S1-6).",
         edges=[
@@ -170,46 +184,8 @@ def build_address_graph(
         ],
     )
 
-
-def build_address_app(
-    bridge_card_url: str | None = None,
-    *,
-    max_rounds: int = MAX_ROUNDS,
-) -> App:
-    """Wrap :func:`build_address_graph` in a resumable ``App``.
-
-    ``ResumabilityConfig(is_resumable=True)`` is what makes a parked leg
-    resumable across a process restart; it lives on ``App``, so a durable run
-    must go through the ``App`` path (not a bare ``agent=``/``node=`` Runner) —
-    docs/lessons-learned A13. ``ResumabilityConfig`` is ``@experimental`` in ADK
-    2.7.0 (ADR-0012).
-
-    Note: this only sets the resumability switch. The *durable stores* that make
-    a park survive a restart — ``DatabaseSessionService`` (Sessions seam) and the
-    Bridge's ``DatabaseTaskStore`` (Task-store seam) — are wired at ``Runner``
-    construction by the caller, not here; the default driver (``__main__``) runs
-    ``InMemory*`` for a single-process demo.
-    """
     return App(
         name=APP_NAME,
-        root_agent=build_address_graph(bridge_card_url, max_rounds=max_rounds),
+        root_agent=graph,
         resumability_config=ResumabilityConfig(is_resumable=True),
     )
-
-
-root_agent = build_address_graph()
-"""The durable Collect-loop graph, for ADK tooling that wants a bare root agent.
-
-``Workflow`` is a ``BaseNode`` (a valid ADK root); building it here is
-side-effect-free — ``RemoteA2aAgent`` only stores the card URL, so no network call
-happens until a turn runs. Prefer :data:`app` for ``adk web`` / deploy: the ADK
-agent loader picks up a module-level ``App`` before ``root_agent``, and only the
-``App`` path carries ``ResumabilityConfig`` (durable park/resume — A13).
-"""
-
-app = build_address_app()
-"""The resumable ``App`` wrapping the graph — the entry point for ``adk web`` and
-deploy. The ADK agent loader discovers a module-level ``app`` (an ``App``) ahead of
-``root_agent``, so pointing ``adk web`` at this package surfaces the **durable**
-construct (ADR-0010), not a bare graph.
-"""
