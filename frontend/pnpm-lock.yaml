@@ -94,6 +94,50 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@24.13.3))
 
+  apps/theater:
+    dependencies:
+      '@bridge/agent-console':
+        specifier: workspace:*
+        version: link:../../packages/agent-console
+      '@bridge/ops-dashboard':
+        specifier: workspace:*
+        version: link:../../packages/ops-dashboard
+      '@bridge/provider-portal':
+        specifier: workspace:*
+        version: link:../../packages/provider-portal
+      '@bridge/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@bridge/timewarp':
+        specifier: workspace:*
+        version: link:../../packages/timewarp
+
+  packages/agent-console:
+    dependencies:
+      '@bridge/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/ops-dashboard:
+    dependencies:
+      '@bridge/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/provider-portal:
+    dependencies:
+      '@bridge/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/shared: {}
+
+  packages/timewarp:
+    dependencies:
+      '@bridge/shared':
+        specifier: workspace:*
+        version: link:../shared
+
 packages:
 
   '@adobe/css-tools@4.5.0':

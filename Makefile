@@ -6,6 +6,7 @@ help:  ## Show this help
 	  awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
 setup:  ## One-command dev setup: install all deps + enable pre-commit
+	cd contract && uv sync
 	cd agents && uv sync
 	cd bridge && uv sync
 	cd frontend && pnpm install

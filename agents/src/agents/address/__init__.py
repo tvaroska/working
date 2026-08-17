@@ -8,7 +8,6 @@ deploy entry point; :data:`root_agent` is the bare graph for tooling that wants 
 
 from .agent import app, root_agent
 from .config import APP_NAME, PARTY, SKILL
-from .graph import build_address_app
 from .satisfaction import (
     TERMINAL_TURN_STATE_KEY,
     SatisfactionResult,
@@ -18,7 +17,6 @@ from .satisfaction import (
 __all__ = [
     "app",
     "root_agent",
-    "build_address_app",
     "PARTY",
     "SKILL",
     "APP_NAME",

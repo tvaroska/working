@@ -1,0 +1,20 @@
+{
+  "name": "theater",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@bridge/agent-console": "workspace:*",
+    "@bridge/ops-dashboard": "workspace:*",
+    "@bridge/provider-portal": "workspace:*",
+    "@bridge/shared": "workspace:*",
+    "@bridge/timewarp": "workspace:*"
+  }
+}

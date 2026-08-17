@@ -5,14 +5,14 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "pnpm --filter theater dev",
+    "build": "pnpm -r build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
+    "test": "pnpm -r test",
     "test:e2e": "playwright test",
-    "preview": "vite preview"
+    "preview": "pnpm --filter theater preview"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
