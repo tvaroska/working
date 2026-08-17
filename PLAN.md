@@ -144,3 +144,6 @@ Full sequence and later releases: [`docs/roadmap.md`](docs/roadmap.md), [`wiki/b
 **Definition of done:** `bridge/` runs the real Bridge on local seam adapters; the address agent reaches the same terminal outcomes against real as against the mock with **only the card URL changed**; disposition/canonicalization/completeness are deterministic and unit-tested against `wiki/evals/address/expected.json`; the classified ledger has a deterministic sort key; proactive `overdue→escalated` fires on the virtual clock; the shared seam suite is green on local for all six seams; `bridge/` imports no `agents/` module.
 
 **Validation gate:** Bridge-core review with the design owner — aggregate model (exchange-as-view), the sense-A/sense-B split (Bridge advisory vs app-decides-done), and terminal-outcome parity across mock↔real — before Sprint 2 adds the GCP adapters behind the same seams.
+
+**M1 sign-off (2026-08-16):**
+- **ADR-0013** (agent-authored explanations) ratified: Status Proposed→**Accepted**. The `reason_code`-as-free-string trade-off is accepted on the record (chase rides on `status`, not `reason_code`, so an unrecognized code still chases correctly). M1.9 was built against it — code and decision are now aligned. The A2UI declarative render-spec remains out of scope for 0013 (follow-on).

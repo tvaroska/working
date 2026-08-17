@@ -1,7 +1,8 @@
 # ADR-0013 — Servicing-agent-authored explanations relayed to the party via A2UI
 
-- **Status:** Proposed (not yet ratified at a sprint gate)
+- **Status:** Accepted
 - **Date:** 2026-08-16
+- **Ratified at:** M1 sign-off gate (2026-08-16) — the `reason_code`-as-free-string trade-off (see Consequences) accepted on the record; contract fields (`reason_code`/`message`, `Requirement`/`RequirementsList`) and the requirements-with-reasons relay were built in M1.9 against this decision.
 - **Context:** `wiki/bridge-collect.md` (Requirements vs Collection-status ownership; the Sense A/B line), `wiki/bridge-a2ui-edge.md` (content-not-pixels), `docs/decisions/adr-0011-contract-type-sharing.md` (shared contract types), `docs/lessons-learned.md` A3 (LLM routes, code decides). Extends the Collect contract in `agents/src/contract/models.py`.
 
 ## Context
@@ -53,7 +54,7 @@ The A2UI content model itself (declarative render spec) is **out of scope for th
 - **A3 is preserved and sharpened.** The deterministic gate still owns the verdict (`reason_code`); the LLM's contribution is confined to prose (`message`) that cannot change the route. A model still may **never** mint a KYC acceptance.
 - **`reason_code` is an unbounded string.** This is deliberate (pluggability) but means there is no compile-time check that the Bridge's chase logic handles every code. Mitigation: the Bridge's chase behavior is driven by `status` (`required`/`optional`) — the mechanical knob — not by `reason_code`; an unrecognized `reason_code` still chases correctly, it just isn't specially handled.
 - **Bounded vs emergent both fit.** The bounded Address demo can pre-author `message` templates against its fixed rule; the emergent RFP demo (`bridge-collect.md:56`) has its app compose `message` per turn via LLM. `next_requirements` remains a pure function of `(status, ledger)`, so no side sits in the loop.
-- **This is a contract extension, so it is ADR-gated and not yet built.** The current Address demo is the bounded slice (deterministic `is_satisfied` gate returning a terminal ledger); the requirements-with-reasons round trip and the A2UI mapper are follow-on work. Status remains **Proposed** until ratified at a sprint gate.
+- **This is a contract extension, ratified at the M1 sign-off gate (2026-08-16).** The bounded Address demo (deterministic `is_satisfied` gate returning a terminal ledger) is unaffected; the requirements-with-reasons round trip landed in **M1.9** (`bridge/src/bridge/requirements.py`, contract fields, `skills/address-proof/assets/explanations.yaml`). The A2UI content-model mapper remains follow-on work (M1.10 reference renderer is demo furniture; the declarative render spec is out of scope for this ADR, per §4).
 
 ## Cross-references
 
